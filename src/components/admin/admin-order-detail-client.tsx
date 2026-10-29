@@ -13,6 +13,8 @@ import { getSectionIcon } from "@/components/icons/SectionIcons";
 import {
   generateOrderWordBlob,
   generateOrderPdfBlob,
+  formatOrderStatusLabel,
+  hasAnyAnswerInOrder,
 } from "@/lib/editorial-exports";
 import {
   Copy,
@@ -27,6 +29,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  ArrowRight,
 } from "lucide-react";
 
 interface OrderSummary {
@@ -46,6 +49,7 @@ interface OrderSummary {
   driveFolderId: string;
   driveFolderUrl?: string;
   createdAt: string;
+  updatedAt?: string;
   submittedAt: string | null;
 }
 
@@ -203,10 +207,11 @@ export function AdminOrderDetailClient({
 
   const handleStatusChange = async (nextStatus: OrderStatus) => {
     setStatus(nextStatus);
+    const nextLabel = formatOrderStatusLabel(nextStatus);
     notifyAdmin(
       "loading",
       "Updating order status...",
-      `Changing status to "${nextStatus.replace(/_/g, " ")}"`
+      `Moving order to "${nextLabel}"`
     );
     const res = await fetch(`/api/admin/orders/${order.id}`, {
       method: "PATCH",
@@ -216,7 +221,7 @@ export function AdminOrderDetailClient({
     if (res.ok) {
       notifyAdmin(
         "success",
-        `Status updated to "${nextStatus.replace(/_/g, " ")}"`,
+        `Status updated to "${nextLabel}"`,
         `Recorded in workflow history for ${order.reference}`
       );
       router.refresh();
@@ -372,6 +377,9 @@ export function AdminOrderDetailClient({
   };
 
   const coverPhoto = photos.find((p) => p.isCover) ?? photos[0];
+  const hasPhotos = photos.length > 0;
+  const hasDriveLink = Boolean(driveFolderUrl && driveFolderUrl.trim());
+  const hasBriefContent = hasAnyAnswerInOrder(values, photos);
 
   return (
     <div className="space-y-8">
@@ -508,86 +516,95 @@ export function AdminOrderDetailClient({
 
           {/* Primary Communication & Folder Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowEmailModal((prev) => !prev)}
-            >
-              <Mail className="h-3.5 w-3.5 text-[#9E4765]" />
-              Send email
-            </Button>
-
-            <Button asChild size="sm">
-              <a
-                href={driveFolderUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+            {order.email && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEmailModal((prev) => !prev)}
               >
-                <FolderOpen className="h-3.5 w-3.5" />
-                Open Drive Folder ({photos.length} Photos)
-              </a>
-            </Button>
+                <Mail className="h-3.5 w-3.5 text-[#9E4765]" />
+                Send email
+              </Button>
+            )}
+
+            {hasDriveLink && (
+              <Button asChild size="sm">
+                <a
+                  href={driveFolderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Open Drive Folder
+                  {hasPhotos ? ` (${photos.length} Photos)` : ""}
+                </a>
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Streamlined Editorial Exports Toolbar (ZIP, Word, PDF only) */}
-        <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-[#F3ECE7]">
-          <span className="text-xs font-medium text-[#7A686E] mr-1">
-            Editorial Exports:
-          </span>
+        {/* Streamlined Intelligent Editorial Exports Toolbar */}
+        {hasBriefContent && (
+          <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-[#F3ECE7]">
+            <span className="text-xs font-medium text-[#7A686E] mr-1">
+              Editorial Exports:
+            </span>
 
-          <Button
-            type="button"
-            variant="editorial"
-            size="sm"
-            disabled={activeExport !== null}
-            onClick={() => void handleDownloadPhotosZip()}
-          >
-            {activeExport === "zip" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
+            {hasPhotos && (
+              <Button
+                type="button"
+                variant="editorial"
+                size="sm"
+                disabled={activeExport !== null}
+                onClick={() => void handleDownloadPhotosZip()}
+              >
+                {activeExport === "zip" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {activeExport === "zip"
+                  ? "Packaging Photos (.zip)..."
+                  : `Download all ${photos.length} images (.zip)`}
+              </Button>
             )}
-            {activeExport === "zip"
-              ? "Packaging Photos (.zip)..."
-              : `Download all images (.zip)`}
-          </Button>
 
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={activeExport !== null}
-            onClick={() => void handleExportWord()}
-          >
-            {activeExport === "word" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileText className="h-3.5 w-3.5 text-[#9E4765]" />
-            )}
-            {activeExport === "word"
-              ? "Building Word (.docx)..."
-              : "Export to Word (.docx)"}
-          </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={activeExport !== null}
+              onClick={() => void handleExportWord()}
+            >
+              {activeExport === "word" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileText className="h-3.5 w-3.5 text-[#9E4765]" />
+              )}
+              {activeExport === "word"
+                ? "Building Word (.docx)..."
+                : "Export to Word (.docx)"}
+            </Button>
 
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={activeExport !== null}
-            onClick={() => void handleExportPdf()}
-          >
-            {activeExport === "pdf" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileDown className="h-3.5 w-3.5 text-[#9E4765]" />
-            )}
-            {activeExport === "pdf"
-              ? "Building PDF (.pdf)..."
-              : "Export to PDF (.pdf)"}
-          </Button>
-        </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={activeExport !== null}
+              onClick={() => void handleExportPdf()}
+            >
+              {activeExport === "pdf" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileDown className="h-3.5 w-3.5 text-[#9E4765]" />
+              )}
+              {activeExport === "pdf"
+                ? "Building PDF (.pdf)..."
+                : "Export to PDF (.pdf)"}
+            </Button>
+          </div>
+        )}
 
         {/* Inline Send Email Panel */}
         {showEmailModal && (
@@ -660,65 +677,73 @@ export function AdminOrderDetailClient({
                         </h2>
                       </div>
                     </div>
-                    <Button asChild size="default">
-                      <a
-                        href={driveFolderUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                        Open Order Folder in Google Drive
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    </Button>
+                    {hasDriveLink && (
+                      <Button asChild size="default">
+                        <a
+                          href={driveFolderUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Open Order Folder in Google Drive
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </Button>
+                    )}
                   </div>
 
                   {/* Direct Google Drive Folder Reference Card */}
-                  <div className="rounded-2xl border border-[#EAE0DA] bg-[#FCF9F7] p-5 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-medium uppercase tracking-wider text-[#7A686E]">
-                        Order Drive Link
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void copyText(
-                            "drive-url",
-                            driveFolderUrl,
-                            "Google Drive folder link"
-                          )
-                        }
-                        className="inline-flex items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-2.5 py-1 text-[11px] text-[#5C4950] hover:border-[#9E4765] hover:text-[#9E4765] cursor-pointer"
-                      >
-                        {copiedKey === "drive-url" ? (
-                          <>
-                            <Check className="h-3 w-3 text-[#15803D]" />
-                            Copied Link
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            Copy Drive Link
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs font-mono text-[#9E4765] break-all bg-white p-3 rounded-xl border border-[#EFE6E0]">
-                      {driveFolderUrl}
-                    </p>
-                    {coverPhoto && (
-                      <div className="flex items-center gap-2 text-xs text-[#7A2E48] font-medium pt-1">
-                        <Star className="h-3.5 w-3.5 fill-current text-[#9E4765]" />
-                        <span>
-                          Selected Cover Photo:{" "}
-                          <strong>{coverPhoto.originalName}</strong>
-                          {coverPhoto.caption
-                            ? ` — "${coverPhoto.caption}"`
-                            : ""}
+                  {hasDriveLink ? (
+                    <div className="rounded-2xl border border-[#EAE0DA] bg-[#FCF9F7] p-5 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wider text-[#7A686E]">
+                          Order Drive Link
                         </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void copyText(
+                              "drive-url",
+                              driveFolderUrl,
+                              "Google Drive folder link"
+                            )
+                          }
+                          className="inline-flex items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-2.5 py-1 text-[11px] text-[#5C4950] hover:border-[#9E4765] hover:text-[#9E4765] cursor-pointer"
+                        >
+                          {copiedKey === "drive-url" ? (
+                            <>
+                              <Check className="h-3 w-3 text-[#15803D]" />
+                              Copied Link
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3" />
+                              Copy Drive Link
+                            </>
+                          )}
+                        </button>
                       </div>
-                    )}
-                  </div>
+                      <p className="text-xs font-mono text-[#9E4765] break-all bg-white p-3 rounded-xl border border-[#EFE6E0]">
+                        {driveFolderUrl}
+                      </p>
+                      {coverPhoto && (
+                        <div className="flex items-center gap-2 text-xs text-[#7A2E48] font-medium pt-1">
+                          <Star className="h-3.5 w-3.5 fill-current text-[#9E4765]" />
+                          <span>
+                            Selected Cover Photo:{" "}
+                            <strong>{coverPhoto.originalName}</strong>
+                            {coverPhoto.caption
+                              ? ` — "${coverPhoto.caption}"`
+                              : ""}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-[#EAE0DA] bg-[#FCF9F7] p-5 text-xs text-[#7A686E] italic">
+                      No photographs have been uploaded for this order yet. Once the customer uploads their photos, their dedicated Google Drive folder link and photo captions will appear here automatically.
+                    </div>
+                  )}
 
                   {Boolean(values["photo_link_fallback"]) && (
                     <div className="rounded-xl border border-[#EAE0DA] bg-[#FCF9F7] p-3.5 text-xs">
@@ -961,56 +986,68 @@ export function AdminOrderDetailClient({
             <h2 className="font-serif text-xl text-[#1F1619] border-b border-[#F3ECE7] pb-2.5">
               Order Files &amp; Exports
             </h2>
-            <p className="text-xs text-[#6E5A61] leading-relaxed">
-              Download the formatted editorial brief in Word or PDF for layout design, or download all original uploaded photographs in a single ZIP archive.
-            </p>
-            <div className="space-y-2.5">
-              <Button
-                type="button"
-                variant="editorial"
-                size="sm"
-                className="w-full justify-start"
-                disabled={activeExport !== null}
-                onClick={() => void handleDownloadPhotosZip()}
-              >
-                {activeExport === "zip" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                Download All Images (.zip)
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="w-full justify-start"
-                disabled={activeExport !== null}
-                onClick={() => void handleExportWord()}
-              >
-                {activeExport === "word" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4 text-[#9E4765]" />
-                )}
-                Export Brief to Word (.docx)
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="w-full justify-start"
-                disabled={activeExport !== null}
-                onClick={() => void handleExportPdf()}
-              >
-                {activeExport === "pdf" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileDown className="h-4 w-4 text-[#9E4765]" />
-                )}
-                Export Brief to PDF (.pdf)
-              </Button>
-            </div>
+            {!hasBriefContent ? (
+              <p className="text-xs italic text-[#8C7A80] leading-relaxed">
+                This draft does not have any completed answers or uploaded photos yet. Exports will become available as soon as the customer starts filling in their questionnaire.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-[#6E5A61] leading-relaxed">
+                  {hasPhotos
+                    ? `Download the formatted editorial brief in Word or PDF for layout design, or download all ${photos.length} original uploaded photographs in a single ZIP archive.`
+                    : "Download the formatted editorial brief in Word or PDF for layout design. Photo ZIP export will appear automatically once photos are uploaded."}
+                </p>
+                <div className="space-y-2.5">
+                  {hasPhotos && (
+                    <Button
+                      type="button"
+                      variant="editorial"
+                      size="sm"
+                      className="w-full justify-start"
+                      disabled={activeExport !== null}
+                      onClick={() => void handleDownloadPhotosZip()}
+                    >
+                      {activeExport === "zip" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      Download All {photos.length} Images (.zip)
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full justify-start"
+                    disabled={activeExport !== null}
+                    onClick={() => void handleExportWord()}
+                  >
+                    {activeExport === "word" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-[#9E4765]" />
+                    )}
+                    Export Brief to Word (.docx)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full justify-start"
+                    disabled={activeExport !== null}
+                    onClick={() => void handleExportPdf()}
+                  >
+                    {activeExport === "pdf" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileDown className="h-4 w-4 text-[#9E4765]" />
+                    )}
+                    Export Brief to PDF (.pdf)
+                  </Button>
+                </div>
+              </>
+            )}
           </section>
 
           {/* Status History */}
@@ -1027,13 +1064,22 @@ export function AdminOrderDetailClient({
                 {statusHistory.map((sh) => (
                   <div
                     key={sh.id}
-                    className="rounded-xl border border-[#F3ECE7] bg-[#FCF9F7] p-3 text-xs space-y-1"
+                    className="rounded-xl border border-[#F3ECE7] bg-[#FCF9F7] p-3.5 text-xs space-y-1.5"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-[#1F1619]">
-                        {sh.fromStatus ? `${sh.fromStatus} -> ` : ""}
-                        {sh.toStatus}
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 font-medium text-[#1F1619]">
+                        {sh.fromStatus ? (
+                          <>
+                            <span className="inline-flex items-center rounded-full border border-[#EAE0DA] bg-white px-2.5 py-0.5 text-[11px] text-[#5C4950]">
+                              {formatOrderStatusLabel(sh.fromStatus)}
+                            </span>
+                            <ArrowRight className="h-3 w-3 text-[#9E4765]" />
+                          </>
+                        ) : null}
+                        <span className="inline-flex items-center rounded-full border border-[#EAD4DF] bg-[#F6EBF0] px-2.5 py-0.5 text-[11px] font-semibold text-[#7A2E48]">
+                          {formatOrderStatusLabel(sh.toStatus)}
+                        </span>
+                      </div>
                       <span className="text-[10px] text-[#8C7A80]">
                         {new Date(sh.createdAt).toLocaleString("en-GB", {
                           day: "2-digit",
@@ -1044,7 +1090,9 @@ export function AdminOrderDetailClient({
                       </span>
                     </div>
                     <p className="text-[11px] text-[#7A686E]">
-                      By {sh.adminEmail}
+                      {sh.adminEmail === "customer_submission"
+                        ? "Submitted by Customer"
+                        : `Updated by ${sh.adminEmail}`}
                     </p>
                   </div>
                 ))}

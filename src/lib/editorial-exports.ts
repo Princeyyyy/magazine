@@ -47,6 +47,46 @@ export interface EditorialExportPhoto {
   uploadedAt: string;
 }
 
+const HUMAN_STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Submitted",
+  in_progress: "In Progress",
+  awaiting_photos: "Awaiting Photos",
+  in_design: "In Design",
+  ready: "Ready for Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+export function formatOrderStatusLabel(status: string | null | undefined): string {
+  if (!status) return "Unknown";
+  return (
+    HUMAN_STATUS_LABELS[status] ||
+    status
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+export function hasAnyAnswerInOrder(
+  values: Record<string, unknown>,
+  photos: EditorialExportPhoto[]
+): boolean {
+  if (photos.length > 0) return true;
+  for (const page of FORM_PAGES) {
+    for (const group of page.groups) {
+      for (const field of group.fields) {
+        if (field.key === "subject_gender" || field.type === "photoUpload") {
+          continue;
+        }
+        const lines = getFormattedFieldLines(field, values);
+        if (lines.length > 0) return true;
+      }
+    }
+  }
+  return false;
+}
+
 function getFormattedFieldLines(
   field: FieldConfig,
   values: Record<string, unknown>
@@ -57,7 +97,7 @@ function getFormattedFieldLines(
     const filled = rows.filter((r) =>
       field.subFields.some((sf) => (r[sf.key] ?? "").trim().length > 0)
     );
-    if (filled.length === 0) return ["Not provided"];
+    if (filled.length === 0) return [];
     return filled.map((row, idx) => {
       const joined = field.subFields
         .map((sf) => (row[sf.key] ?? "").trim())
@@ -67,11 +107,15 @@ function getFormattedFieldLines(
     });
   }
 
+  if (field.type === "checkbox") {
+    return raw === true ? ["Confirmed (Yes)"] : [];
+  }
+
   const str =
     raw !== undefined && raw !== null && String(raw).trim() !== ""
       ? String(raw).trim()
-      : "Not provided";
-  return [str];
+      : "";
+  return str ? [str] : [];
 }
 
 // ============================================================================
@@ -149,7 +193,7 @@ export async function generateOrderWordBlob(
   // Metadata Summary Table
   const metaRows: [string, string][] = [
     ["Order Reference", order.reference],
-    ["Order Status", order.status.replace(/_/g, " ").toUpperCase()],
+    ["Order Status", formatOrderStatusLabel(order.status)],
     [
       "Featured Star",
       `${starName}${order.herNickname ? ` (${order.herNickname})` : ""} — ${gender}`,
@@ -165,8 +209,15 @@ export async function generateOrderWordBlob(
     ],
     ["Customer Email", order.email || "—"],
     ["Customer Phone", order.phoneE164 || "—"],
-    ["Photos Uploaded", `${photos.length} Photos`],
-    ["Google Drive Folder Link", driveFolderUrl || "—"],
+    [
+      "Photos Uploaded",
+      photos.length > 0
+        ? `${photos.length} ${photos.length === 1 ? "Photo" : "Photos"}`
+        : "No photos uploaded yet",
+    ],
+    ...(driveFolderUrl
+      ? ([["Google Drive Folder Link", driveFolderUrl]] as [string, string][])
+      : []),
   ];
 
   children.push(
@@ -236,61 +287,94 @@ export async function generateOrderWordBlob(
     const pageTitle = adaptCopyByGender(page.title, gender);
     const pageSubtitle = adaptCopyByGender(page.subtitle, gender);
 
-    children.push(
-      new Paragraph({
-        spacing: { before: 320, after: 60 },
-        children: [
-          new TextRun({
-            text: `CHAPTER ${page.pageNumber}  —  ${pageSubtitle.toUpperCase()}`,
-            font: "Georgia",
-            size: 18,
-            bold: true,
-            color: "9E4765",
-          }),
-        ],
-      })
-    );
-
-    children.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        spacing: { after: 200 },
-        border: {
-          bottom: { style: BorderStyle.SINGLE, size: 6, color: "E3D4CC" },
-        },
-        children: [
-          new TextRun({
-            text: pageTitle,
-            font: "Georgia",
-            size: 34,
-            bold: true,
-            color: "1F1619",
-          }),
-        ],
-      })
-    );
-
     if (page.id === "photos") {
+      const fallbackLink =
+        typeof values["photo_link_fallback"] === "string"
+          ? values["photo_link_fallback"].trim()
+          : "";
+      if (photos.length === 0 && !driveFolderUrl && !fallbackLink) {
+        continue;
+      }
+
       children.push(
         new Paragraph({
-          spacing: { before: 120, after: 120 },
+          spacing: { before: 320, after: 60 },
           children: [
             new TextRun({
-              text: "Google Drive Folder Link: ",
+              text: `CHAPTER ${page.pageNumber}  —  ${pageSubtitle.toUpperCase()}`,
               font: "Georgia",
+              size: 18,
               bold: true,
-              size: 21,
-              color: "1F1619",
-            }),
-            new TextRun({
-              text: driveFolderUrl,
-              font: "Georgia",
-              size: 21,
               color: "9E4765",
             }),
           ],
         })
       );
+
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_1,
+          spacing: { after: 200 },
+          border: {
+            bottom: { style: BorderStyle.SINGLE, size: 6, color: "E3D4CC" },
+          },
+          children: [
+            new TextRun({
+              text: pageTitle,
+              font: "Georgia",
+              size: 34,
+              bold: true,
+              color: "1F1619",
+            }),
+          ],
+        })
+      );
+
+      if (driveFolderUrl) {
+        children.push(
+          new Paragraph({
+            spacing: { before: 120, after: 120 },
+            children: [
+              new TextRun({
+                text: "Google Drive Folder Link: ",
+                font: "Georgia",
+                bold: true,
+                size: 21,
+                color: "1F1619",
+              }),
+              new TextRun({
+                text: driveFolderUrl,
+                font: "Georgia",
+                size: 21,
+                color: "9E4765",
+              }),
+            ],
+          })
+        );
+      }
+
+      if (fallbackLink) {
+        children.push(
+          new Paragraph({
+            spacing: { before: 80, after: 120 },
+            children: [
+              new TextRun({
+                text: "Shared Photo Link Fallback: ",
+                font: "Georgia",
+                bold: true,
+                size: 21,
+                color: "1F1619",
+              }),
+              new TextRun({
+                text: fallbackLink,
+                font: "Georgia",
+                size: 21,
+                color: "9E4765",
+              }),
+            ],
+          })
+        );
+      }
 
       if (coverPhoto) {
         children.push(
@@ -376,13 +460,77 @@ export async function generateOrderWordBlob(
       continue;
     }
 
-    for (const group of page.groups) {
+    // Collect only groups that have at least one answered field
+    const populatedGroups = page.groups
+      .map((group) => {
+        const answeredFields = group.fields
+          .filter((field) => {
+            if (field.type === "photoUpload") return false;
+            if (field.conditional) {
+              if (
+                values[field.conditional.fieldKey] !== field.conditional.equals
+              ) {
+                return false;
+              }
+            }
+            return getFormattedFieldLines(field, values).length > 0;
+          })
+          .map((field) => ({
+            label: adaptCopyByGender(field.label, gender),
+            lines: getFormattedFieldLines(field, values),
+          }));
+        return {
+          title: adaptCopyByGender(group.title, gender),
+          fields: answeredFields,
+        };
+      })
+      .filter((g) => g.fields.length > 0);
+
+    if (populatedGroups.length === 0) {
+      continue;
+    }
+
+    children.push(
+      new Paragraph({
+        spacing: { before: 320, after: 60 },
+        children: [
+          new TextRun({
+            text: `CHAPTER ${page.pageNumber}  —  ${pageSubtitle.toUpperCase()}`,
+            font: "Georgia",
+            size: 18,
+            bold: true,
+            color: "9E4765",
+          }),
+        ],
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        spacing: { after: 200 },
+        border: {
+          bottom: { style: BorderStyle.SINGLE, size: 6, color: "E3D4CC" },
+        },
+        children: [
+          new TextRun({
+            text: pageTitle,
+            font: "Georgia",
+            size: 34,
+            bold: true,
+            color: "1F1619",
+          }),
+        ],
+      })
+    );
+
+    for (const group of populatedGroups) {
       children.push(
         new Paragraph({
           spacing: { before: 220, after: 100 },
           children: [
             new TextRun({
-              text: adaptCopyByGender(group.title, gender),
+              text: group.title,
               font: "Georgia",
               bold: true,
               italics: true,
@@ -394,22 +542,12 @@ export async function generateOrderWordBlob(
       );
 
       for (const field of group.fields) {
-        if (field.type === "photoUpload") continue;
-        if (field.conditional) {
-          if (values[field.conditional.fieldKey] !== field.conditional.equals) {
-            continue;
-          }
-        }
-
-        const label = adaptCopyByGender(field.label, gender);
-        const answerLines = getFormattedFieldLines(field, values);
-
         children.push(
           new Paragraph({
             spacing: { before: 120, after: 40 },
             children: [
               new TextRun({
-                text: label,
+                text: field.label,
                 font: "Georgia",
                 bold: true,
                 size: 20,
@@ -419,7 +557,7 @@ export async function generateOrderWordBlob(
           })
         );
 
-        for (const line of answerLines) {
+        for (const line of field.lines) {
           children.push(
             new Paragraph({
               spacing: { after: 80 },
@@ -429,8 +567,7 @@ export async function generateOrderWordBlob(
                   text: line,
                   font: "Georgia",
                   size: 21,
-                  color: line === "Not provided" ? "96838A" : "1F1619",
-                  italics: line === "Not provided",
+                  color: "1F1619",
                 }),
               ],
             })
@@ -545,21 +682,30 @@ export function generateOrderPdfBlob(
   }
 
   // Summary Box
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(231, 218, 210);
-  doc.setLineWidth(0.8);
-  doc.roundedRect(marginX, y, contentWidth, 134, 8, 8, "FD");
-
   const summaryItems: [string, string][] = [
     ["Order Reference:", order.reference],
+    ["Order Status:", formatOrderStatusLabel(order.status)],
     ["Ordered By:", `${order.customerName || "—"} (${order.relationship || "Loved one"})`],
     ["Customer Email:", order.email || "—"],
     ["Customer Phone:", order.phoneE164 || "—"],
     ["Birthday & Age:", `${order.birthdayDate || "—"} ${order.ageTurning ? `(Turning ${order.ageTurning})` : ""}`],
     ["Colour Theme:", order.colourTheme || "—"],
-    ["Photos Uploaded:", `${photos.length} Photos`],
-    ["Google Drive Link:", driveFolderUrl || "—"],
+    [
+      "Photos Uploaded:",
+      photos.length > 0
+        ? `${photos.length} ${photos.length === 1 ? "Photo" : "Photos"}`
+        : "No photos uploaded yet",
+    ],
+    ...(driveFolderUrl
+      ? ([["Google Drive Link:", driveFolderUrl]] as [string, string][])
+      : []),
   ];
+
+  const boxHeight = summaryItems.length * 14.5 + 22;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(231, 218, 210);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(marginX, y, contentWidth, boxHeight, 8, 8, "FD");
 
   let sy = y + 20;
   for (const [k, v] of summaryItems) {
@@ -576,46 +722,82 @@ export function generateOrderPdfBlob(
     sy += 14.5;
   }
 
-  y += 154;
+  y += boxHeight + 18;
 
   // Iterate through all 9 sections
   for (const page of FORM_PAGES) {
     const pageTitle = adaptCopyByGender(page.title, gender);
     const pageSubtitle = adaptCopyByGender(page.subtitle, gender);
 
-    ensureSpace(75);
-    y += 10;
-
-    // Section Banner
-    doc.setFillColor(246, 235, 240);
-    doc.roundedRect(marginX, y, contentWidth, 38, 6, 6, "F");
-
-    doc.setFont("times", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(158, 71, 101);
-    doc.text(`Chapter ${page.pageNumber} — ${pageSubtitle}`, marginX + 12, y + 14);
-
-    doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(31, 22, 25);
-    doc.text(pageTitle, marginX + 12, y + 30);
-
-    y += 52;
-
     if (page.id === "photos") {
-      ensureSpace(50);
-      doc.setFont("times", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(122, 46, 72);
-      doc.text("Google Drive Order Folder:", marginX, y);
-      y += 14;
+      const fallbackLink =
+        typeof values["photo_link_fallback"] === "string"
+          ? values["photo_link_fallback"].trim()
+          : "";
+      if (photos.length === 0 && !driveFolderUrl && !fallbackLink) {
+        continue;
+      }
 
-      doc.setFont("times", "normal");
-      doc.setFontSize(9.5);
+      ensureSpace(75);
+      y += 10;
+
+      // Section Banner
+      doc.setFillColor(246, 235, 240);
+      doc.roundedRect(marginX, y, contentWidth, 38, 6, 6, "F");
+
+      doc.setFont("times", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(158, 71, 101);
+      doc.text(
+        `Chapter ${page.pageNumber} — ${pageSubtitle}`,
+        marginX + 12,
+        y + 14
+      );
+
+      doc.setFont("times", "bold");
+      doc.setFontSize(14);
       doc.setTextColor(31, 22, 25);
-      const urlLines = doc.splitTextToSize(driveFolderUrl, contentWidth) as string[];
-      doc.text(urlLines, marginX, y);
-      y += urlLines.length * 13 + 8;
+      doc.text(pageTitle, marginX + 12, y + 30);
+
+      y += 52;
+
+      if (driveFolderUrl) {
+        ensureSpace(40);
+        doc.setFont("times", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(122, 46, 72);
+        doc.text("Google Drive Order Folder:", marginX, y);
+        y += 14;
+
+        doc.setFont("times", "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(31, 22, 25);
+        const urlLines = doc.splitTextToSize(
+          driveFolderUrl,
+          contentWidth
+        ) as string[];
+        doc.text(urlLines, marginX, y);
+        y += urlLines.length * 13 + 8;
+      }
+
+      if (fallbackLink) {
+        ensureSpace(36);
+        doc.setFont("times", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(122, 46, 72);
+        doc.text("Shared Photo Link Fallback:", marginX, y);
+        y += 14;
+
+        doc.setFont("times", "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(31, 22, 25);
+        const fbLines = doc.splitTextToSize(
+          fallbackLink,
+          contentWidth
+        ) as string[];
+        doc.text(fbLines, marginX, y);
+        y += fbLines.length * 13 + 8;
+      }
 
       if (coverPhoto) {
         ensureSpace(24);
@@ -644,12 +826,64 @@ export function generateOrderPdfBlob(
       continue;
     }
 
-    for (const group of page.groups) {
+    const populatedGroups = page.groups
+      .map((group) => {
+        const answeredFields = group.fields
+          .filter((field) => {
+            if (field.type === "photoUpload") return false;
+            if (field.conditional) {
+              if (
+                values[field.conditional.fieldKey] !== field.conditional.equals
+              ) {
+                return false;
+              }
+            }
+            return getFormattedFieldLines(field, values).length > 0;
+          })
+          .map((field) => ({
+            label: adaptCopyByGender(field.label, gender),
+            lines: getFormattedFieldLines(field, values),
+          }));
+        return {
+          title: adaptCopyByGender(group.title, gender),
+          fields: answeredFields,
+        };
+      })
+      .filter((g) => g.fields.length > 0);
+
+    if (populatedGroups.length === 0) {
+      continue;
+    }
+
+    ensureSpace(75);
+    y += 10;
+
+    // Section Banner
+    doc.setFillColor(246, 235, 240);
+    doc.roundedRect(marginX, y, contentWidth, 38, 6, 6, "F");
+
+    doc.setFont("times", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(158, 71, 101);
+    doc.text(
+      `Chapter ${page.pageNumber} — ${pageSubtitle}`,
+      marginX + 12,
+      y + 14
+    );
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(31, 22, 25);
+    doc.text(pageTitle, marginX + 12, y + 30);
+
+    y += 52;
+
+    for (const group of populatedGroups) {
       ensureSpace(40);
       doc.setFont("times", "bolditalic");
       doc.setFontSize(12);
       doc.setTextColor(122, 46, 72);
-      doc.text(adaptCopyByGender(group.title, gender), marginX, y);
+      doc.text(group.title, marginX, y);
       y += 6;
       doc.setDrawColor(235, 224, 216);
       doc.setLineWidth(0.5);
@@ -657,18 +891,8 @@ export function generateOrderPdfBlob(
       y += 14;
 
       for (const field of group.fields) {
-        if (field.type === "photoUpload") continue;
-        if (field.conditional) {
-          if (values[field.conditional.fieldKey] !== field.conditional.equals) {
-            continue;
-          }
-        }
-
-        const label = adaptCopyByGender(field.label, gender);
-        const answerLines = getFormattedFieldLines(field, values);
-
         const wrappedAnswers: string[] = [];
-        for (const ans of answerLines) {
+        for (const ans of field.lines) {
           const split = doc.splitTextToSize(ans, contentWidth - 14) as string[];
           wrappedAnswers.push(...split);
         }
@@ -678,19 +902,12 @@ export function generateOrderPdfBlob(
         doc.setFont("times", "bold");
         doc.setFontSize(10);
         doc.setTextColor(92, 73, 80);
-        doc.text(label, marginX, y);
+        doc.text(field.label, marginX, y);
         y += 13;
 
-        doc.setFont(
-          "times",
-          answerLines[0] === "Not provided" ? "italic" : "normal"
-        );
+        doc.setFont("times", "normal");
         doc.setFontSize(10.5);
-        doc.setTextColor(
-          answerLines[0] === "Not provided" ? 150 : 31,
-          answerLines[0] === "Not provided" ? 131 : 22,
-          answerLines[0] === "Not provided" ? 138 : 25
-        );
+        doc.setTextColor(31, 22, 25);
         doc.text(wrappedAnswers, marginX + 10, y);
         y += wrappedAnswers.length * 13.5 + 8;
       }

@@ -13,23 +13,31 @@ export function verifyAdminPassword(candidate: string): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
-export function signAdminSessionToken(email: string): string {
+export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14; // 14 days
+
+export function signAdminSessionToken(
+  email: string,
+  expiresInSeconds = ADMIN_SESSION_MAX_AGE_SECONDS
+): string {
   const normalized = email.trim().toLowerCase();
+  const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  const payload = `${normalized}|${expiresAt}`;
   const sig = crypto
     .createHmac("sha256", env.AUTH_SECRET)
-    .update(`admin-session:${normalized}`)
+    .update(`admin-session:${payload}`)
     .digest("hex");
-  return `${normalized}.${sig}`;
+  return `${payload}.${sig}`;
 }
 
 export function verifyAdminSessionToken(token: string): string | null {
   const lastDot = token.lastIndexOf(".");
   if (lastDot <= 0) return null;
-  const email = token.slice(0, lastDot).trim().toLowerCase();
+  const payload = token.slice(0, lastDot);
   const sig = token.slice(lastDot + 1);
+
   const expectedSig = crypto
     .createHmac("sha256", env.AUTH_SECRET)
-    .update(`admin-session:${email}`)
+    .update(`admin-session:${payload}`)
     .digest("hex");
 
   const a = Buffer.from(sig);
@@ -38,13 +46,23 @@ export function verifyAdminSessionToken(token: string): string | null {
     return null;
   }
 
+  const pipeIdx = payload.lastIndexOf("|");
+  let email = payload.trim().toLowerCase();
+  if (pipeIdx > 0) {
+    email = payload.slice(0, pipeIdx).trim().toLowerCase();
+    const expiresAt = Number(payload.slice(pipeIdx + 1));
+    if (Number.isNaN(expiresAt) || Math.floor(Date.now() / 1000) > expiresAt) {
+      return null;
+    }
+  }
+
   const allowlist = getAdminAllowlist();
   return allowlist.includes(email) ? email : null;
 }
 
 export const authConfig: NextAuthConfig = {
   secret: env.AUTH_SECRET,
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: ADMIN_SESSION_MAX_AGE_SECONDS },
   pages: {
     signIn: "/admin/login",
     error: "/admin/login",
@@ -119,15 +137,6 @@ export async function getAuthenticatedAdminEmail(): Promise<string | null> {
       if (verifiedEmail) {
         return verifiedEmail;
       }
-    }
-
-    // Backwards compatibility with dev cookie if still present in browser
-    const legacyDevEmail = cookieStore
-      .get("hcm_dev_admin_email")
-      ?.value?.trim()
-      .toLowerCase();
-    if (legacyDevEmail && allowlist.includes(legacyDevEmail)) {
-      return legacyDevEmail;
     }
   } catch {
     // Ignore cookie read error outside request context

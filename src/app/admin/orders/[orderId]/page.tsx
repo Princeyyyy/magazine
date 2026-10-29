@@ -68,7 +68,9 @@ export default async function AdminOrderDetailPage({
   const storage = getPhotoStorage();
   const driveFolderUrl =
     order.driveFolderUrl ||
-    (await storage.getFolderUrl(order.id, order.driveFolderId));
+    (order.driveFolderId
+      ? await storage.getFolderUrl(order.id, order.driveFolderId)
+      : "");
 
   return (
     <div className="space-y-6">
@@ -100,6 +102,7 @@ export default async function AdminOrderDetailPage({
           driveFolderId: order.driveFolderId || "",
           driveFolderUrl,
           createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt.toISOString(),
           submittedAt: order.submittedAt?.toISOString() ?? null,
         }}
         values={values}

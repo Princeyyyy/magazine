@@ -80,6 +80,11 @@ export async function POST(req: NextRequest) {
       throw new Error("Failed to save photo record.");
     }
 
+    await db
+      .update(orders)
+      .set({ updatedAt: new Date() })
+      .where(eq(orders.id, order.id));
+
     return NextResponse.json({
       photo: {
         id: inserted.id,

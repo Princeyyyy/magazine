@@ -153,3 +153,18 @@ export function checkRateLimit(
 export function sanitizeText(input: string): string {
   return input.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
 }
+
+/**
+ * Sanitizes an uploaded filename to prevent path traversal, control chars, or overly long names.
+ */
+export function sanitizeFileName(fileName: string): string {
+  const base = fileName
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop() || "photo.jpg";
+  const cleaned = base
+    .replace(/[\u0000-\u001F\u007F<>:"|?*]/g, "_")
+    .replace(/\.{2,}/g, ".")
+    .trim();
+  return cleaned.slice(0, 140) || "photo.jpg";
+}

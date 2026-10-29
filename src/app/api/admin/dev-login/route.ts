@@ -1,27 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAllowlist } from "@/env";
-import { signAdminSessionToken, verifyAdminPassword } from "@/auth";
-import { handleApiError } from "@/lib/api-response";
-import { ValidationError } from "@/lib/errors";
+import {
+  signAdminSessionToken,
+  verifyAdminPassword,
+  ADMIN_SESSION_MAX_AGE_SECONDS,
+} from "@/auth";
+import { handleApiError, getClientIp } from "@/lib/api-response";
+import { checkRateLimit } from "@/lib/security";
+import { RateLimitError, ValidationError } from "@/lib/errors";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rate = checkRateLimit(`admin:login:${ip}`, 8, 15 * 60_000);
+    if (!rate.allowed) {
+      throw new RateLimitError(rate.retryAfterMs);
+    }
+
     const body = (await req.json()) as { email?: string; password?: string };
     const email = body.email?.trim().toLowerCase() ?? "";
     const password = body.password ?? "";
     const allowlist = getAdminAllowlist();
 
-    if (!email || !allowlist.includes(email)) {
-      throw new ValidationError(
-        "This email is not authorized in ADMIN_EMAILS."
-      );
+    const isEmailAllowed = Boolean(email && allowlist.includes(email));
+    const isPasswordValid = verifyAdminPassword(password);
+
+    if (!isEmailAllowed || !isPasswordValid) {
+      throw new ValidationError("Invalid admin email or password.");
     }
 
-    if (!verifyAdminPassword(password)) {
-      throw new ValidationError("Incorrect admin password.");
-    }
-
-    const token = signAdminSessionToken(email);
+    const token = signAdminSessionToken(email, ADMIN_SESSION_MAX_AGE_SECONDS);
 
     const res = NextResponse.json({ ok: true, email });
     res.cookies.set("hcm_admin_session", token, {
@@ -29,7 +37,7 @@ export async function POST(req: NextRequest) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 14, // 14 days
+      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
     });
     return res;
   } catch (error) {

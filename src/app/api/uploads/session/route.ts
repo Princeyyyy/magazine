@@ -5,7 +5,7 @@ import { orders, photos } from "@/db/schema";
 import { getPhotoStorage } from "@/lib/services/photo-storage";
 import { PHOTO_UPLOAD_CONFIG } from "@/config/form";
 import { handleApiError, getClientIp } from "@/lib/api-response";
-import { checkRateLimit } from "@/lib/security";
+import { checkRateLimit, sanitizeFileName } from "@/lib/security";
 import { NotFoundError, RateLimitError, ValidationError } from "@/lib/errors";
 
 const folderCreationLocks = new Map<string, Promise<string>>();
@@ -75,7 +75,8 @@ export async function POST(req: NextRequest) {
       throw new ValidationError("Missing upload parameters.");
     }
 
-    const ext = body.fileName.toLowerCase().slice(body.fileName.lastIndexOf("."));
+    const safeFileName = sanitizeFileName(body.fileName);
+    const ext = safeFileName.toLowerCase().slice(safeFileName.lastIndexOf("."));
     const allowedExts: readonly string[] = PHOTO_UPLOAD_CONFIG.acceptedExtensions;
     if (!allowedExts.includes(ext)) {
       throw new ValidationError(
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
     const session = await storage.createUploadSession(
       order.id,
       {
-        fileName: body.fileName,
+        fileName: safeFileName,
         mimeType: body.mimeType || "image/jpeg",
         sizeBytes: body.sizeBytes,
         origin,

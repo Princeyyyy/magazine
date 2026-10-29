@@ -62,6 +62,11 @@ export async function PATCH(
       .where(eq(photos.id, photo.id))
       .returning();
 
+    await db
+      .update(orders)
+      .set({ updatedAt: new Date() })
+      .where(eq(orders.id, order.id));
+
     return NextResponse.json({ photo: updated });
   } catch (error) {
     return handleApiError(error);
@@ -108,6 +113,11 @@ export async function DELETE(
     }
 
     await db.delete(photos).where(eq(photos.id, photo.id));
+
+    await db
+      .update(orders)
+      .set({ updatedAt: new Date() })
+      .where(eq(orders.id, order.id));
 
     // If the deleted photo was the cover photo, promote the first remaining photo
     if (photo.isCover) {
