@@ -1,5 +1,6 @@
 import React, { Suspense } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ThankYouView } from "@/components/wizard/thank-you-view";
 import { BrandLogoMark } from "@/components/icons/SectionIcons";
 
@@ -12,9 +13,11 @@ interface ThankYouPageProps {
 
 async function ThankYouContent({ searchParams }: ThankYouPageProps) {
   const params = await searchParams;
-  const reference = params.ref || "HM-2026-0001";
+  if (!params.ref || !params.ref.trim()) {
+    redirect("/");
+  }
 
-  return <ThankYouView reference={reference} herName={params.her} />;
+  return <ThankYouView reference={params.ref.trim()} herName={params.her} />;
 }
 
 export default function ThankYouPage(props: ThankYouPageProps) {

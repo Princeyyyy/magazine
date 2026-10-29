@@ -10,6 +10,40 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [],
   },
+  async redirects() {
+    return [
+      {
+        source: "/order",
+        destination: "/",
+        permanent: true,
+      },
+      {
+        source: "/orders",
+        destination: "/admin",
+        permanent: false,
+      },
+      {
+        source: "/start",
+        destination: "/",
+        permanent: true,
+      },
+      {
+        source: "/brief",
+        destination: "/",
+        permanent: true,
+      },
+      {
+        source: "/questionnaire",
+        destination: "/",
+        permanent: true,
+      },
+      {
+        source: "/resume",
+        destination: "/",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

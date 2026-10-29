@@ -95,6 +95,40 @@ function computeInitialHighestStep(
   return highest;
 }
 
+/**
+ * Checks whether the restored draft has any actual user-entered answers or uploaded photos
+ * so we can distinguish returning visitors with saved progress from blank initial drafts.
+ */
+function hasAnySavedProgress(
+  vals: Record<string, unknown>,
+  photoList: UploadedPhotoItem[]
+): boolean {
+  if (photoList && photoList.length > 0) return true;
+  for (const page of FORM_PAGES) {
+    for (const group of page.groups) {
+      for (const field of group.fields) {
+        if (field.key === "subject_gender") continue;
+        const v = vals[field.key];
+        if (typeof v === "string" && v.trim().length > 0) return true;
+        if (typeof v === "number") return true;
+        if (v === true) return true;
+        if (Array.isArray(v) && v.length > 0) {
+          const anyRowFilled = v.some(
+            (row) =>
+              row &&
+              typeof row === "object" &&
+              Object.values(row as Record<string, unknown>).some(
+                (cell) => typeof cell === "string" && cell.trim().length > 0
+              )
+          );
+          if (anyRowFilled) return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 export function MagazineWizard() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -175,6 +209,7 @@ export function MagazineWizard() {
   const valuesRef = useRef(values);
   valuesRef.current = values;
   const userEditedBeforeInitRef = useRef(false);
+  const welcomedRef = useRef(false);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -230,21 +265,54 @@ export function MagazineWizard() {
         );
         setHighestUnlockedStep(computedMaxStep);
 
+        const hasSavedAnswers = hasAnySavedProgress(
+          data.draft.values,
+          data.draft.photos
+        );
+        const isReturningSession =
+          Boolean(resumeTokenParam) || (Boolean(storedToken) && hasSavedAnswers);
+
         if (!userEditedBeforeInitRef.current) {
           setValues(data.draft.values);
-          // If the user opened an explicit ?resume= link, jump straight to where they left off
-          if (resumeTokenParam && computedMaxStep > 0) {
+
+          if (isReturningSession) {
             const targetStep = Math.min(FORM_PAGES.length - 1, computedMaxStep);
             setCurrentStep(targetStep);
-            const resumedPage = FORM_PAGES[targetStep];
-            showEditorialToast(
-              "Welcome back to your magazine brief",
-              resumedPage
-                ? `Picked up at Chapter ${targetStep + 1}: ${adaptCopyByGender(
+
+            if (!welcomedRef.current) {
+              welcomedRef.current = true;
+              const resumedPage = FORM_PAGES[targetStep];
+              const customerName =
+                typeof data.draft.values["customer_name"] === "string"
+                  ? data.draft.values["customer_name"].trim()
+                  : "";
+              const herName =
+                typeof data.draft.values["her_name"] === "string"
+                  ? data.draft.values["her_name"].trim()
+                  : "";
+              const chapterTitle = resumedPage
+                ? `Chapter ${targetStep + 1}: ${adaptCopyByGender(
                     resumedPage.title,
                     String(data.draft.values["subject_gender"] || "Female")
                   )}`
-                : "Your saved answers and photos have been restored."
+                : "your magazine brief";
+
+              const title = customerName
+                ? `Welcome back, ${customerName}!`
+                : "Welcome back!";
+              const subtitle = herName
+                ? `Picked up where you left off on ${herName}'s issue (${chapterTitle}).`
+                : `Your saved progress has been restored at ${chapterTitle}.`;
+
+              showEditorialToast(title, subtitle, "default", 5500);
+            }
+          } else if (!storedToken && !welcomedRef.current) {
+            welcomedRef.current = true;
+            showEditorialToast(
+              "Welcome to Custom Magazine",
+              "Craft a bespoke editorial keepsake. Your answers and photos save automatically as you go.",
+              "default",
+              5000
             );
           }
         }

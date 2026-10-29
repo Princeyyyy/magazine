@@ -25,9 +25,25 @@ export default async function AdminOrderDetailPage({
   const { orderId } = await params;
   await ensureDbReady();
 
-  const order = await db.query.orders.findFirst({
-    where: eq(orders.id, orderId),
-  });
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      orderId
+    );
+
+  let order = null;
+  if (isUuid) {
+    order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+    });
+  } else {
+    // If an admin entered an order reference (e.g. HM-2026-0001), redirect to the canonical order page
+    const byRef = await db.query.orders.findFirst({
+      where: eq(orders.reference, orderId.toUpperCase().trim()),
+    });
+    if (byRef) {
+      redirect(`/admin/orders/${byRef.id}`);
+    }
+  }
 
   if (!order) {
     notFound();
