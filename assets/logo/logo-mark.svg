@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<defs>
+<linearGradient id="gi" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#FF7BAE"/><stop offset="1" stop-color="#D93272"/></linearGradient>
+<clipPath id="ci"><rect x="16" y="8" width="32" height="48" rx="3.2"/></clipPath>
+</defs>
+<rect width="64" height="64" rx="14" fill="url(#gi)"/>
+<g transform="translate(32 32) scale(1.0) translate(-32 -32)">
+<rect x="17.5" y="10" width="32" height="48" rx="3.2" fill="#8E1B4B" opacity=".28"/>
+<g clip-path="url(#ci)">
+<rect x="16" y="8" width="32" height="48" fill="#FFF6F9"/>
+<rect x="16" y="8" width="6.2" height="48" fill="#F7CADB"/>
+</g>
+<path d="M22.2 8.6V55.4" stroke="#D93272" stroke-opacity=".35" stroke-width=".8"/>
+<rect x="25" y="15" width="19" height="3.6" rx="1.2" fill="#8E1B4B"/><rect x="25" y="21" width="11" height="1.8" rx=".9" fill="#F7CADB"/>
+<path d="M35.2 23.5 Q37.300000000000004 31.9 45.7 34 Q37.300000000000004 36.1 35.2 44.5 Q33.1 36.1 24.700000000000003 34 Q33.1 31.9 35.2 23.5Z" fill="#8E1B4B"/>
+<path d="M42.5 42.3 Q43.34 45.66 46.7 46.5 Q43.34 47.34 42.5 50.7 Q41.66 47.34 38.3 46.5 Q41.66 45.66 42.5 42.3Z" fill="#F6B95C"/>
+</g>
+</svg>
