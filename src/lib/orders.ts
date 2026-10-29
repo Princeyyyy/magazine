@@ -421,15 +421,32 @@ export async function submitOrder(
     );
   }
 
+  // Verify willing submission & permission consent
+  if (
+    !existingOrder.consentAt &&
+    submittedValues?.["permission_consent"] !== true &&
+    hydrated.values["permission_consent"] !== true
+  ) {
+    throw new ValidationError(
+      "Please confirm willing submission and permission consent before submitting.",
+      [
+        {
+          field: "permission_consent",
+          message: "Please check the consent box before submitting.",
+        },
+      ]
+    );
+  }
+
   const validData = parsed.data;
-  const herName = String(validData["her_name"] || "Her");
-  const customerName = String(validData["customer_name"] || "Customer");
-  const email = String(validData["email"] || "");
-  const phoneE164 = String(validData["phone_e164"] || "");
+  const herName = String(validData["her_name"] || existingOrder.herName || "Her");
+  const customerName = String(validData["customer_name"] || existingOrder.customerName || "Customer");
+  const email = String(validData["email"] || existingOrder.email || "");
+  const phoneE164 = String(validData["phone_e164"] || existingOrder.phoneE164 || "");
   const colourTheme =
     validData["colour_theme"] === "Other" && validData["other_colour_theme"]
       ? `Other (${String(validData["other_colour_theme"])})`
-      : String(validData["colour_theme"] || "");
+      : String(validData["colour_theme"] || existingOrder.colourTheme || "");
 
   // Create Google Drive folder ONLY if order actually contains uploaded photos
   let driveFolderId = existingOrder.driveFolderId;

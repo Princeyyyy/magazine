@@ -153,8 +153,8 @@ export function renderAdminNewOrderEmail(props: AdminNewOrderEmailProps): {
   const safeRef = escapeHtml(props.orderReference);
   const safeStar = escapeHtml(props.herName);
   const safeCustomer = escapeHtml(props.customerName);
-  const safeEmail = escapeHtml(props.email);
-  const safePhone = escapeHtml(props.phoneE164);
+  const safeEmail = props.email ? escapeHtml(props.email) : "";
+  const safePhone = props.phoneE164 ? escapeHtml(props.phoneE164) : "";
   const safeColour = escapeHtml(props.colourTheme);
   const safeAdminUrl = escapeHtml(props.adminOrderUrl);
   const safeDriveUrl = props.driveFolderUrl
@@ -218,12 +218,16 @@ export function renderAdminNewOrderEmail(props: AdminNewOrderEmailProps): {
                         <td style="padding:8px 0;font-weight:600;color:#1F1619;border-bottom:1px solid #F2EAE4;">${safeCustomer}</td>
                       </tr>
                       <tr>
-                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Customer Email</td>
-                        <td style="padding:8px 0;border-bottom:1px solid #F2EAE4;"><a href="mailto:${safeEmail}" style="color:#9E4765;text-decoration:none;font-weight:500;">${safeEmail}</a></td>
-                      </tr>
-                      <tr>
-                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Customer Phone</td>
-                        <td style="padding:8px 0;color:#1F1619;border-bottom:1px solid #F2EAE4;">${safePhone}</td>
+                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Customer Contact</td>
+                        <td style="padding:8px 0;border-bottom:1px solid #F2EAE4;">${
+                          safeEmail
+                            ? `<a href="mailto:${safeEmail}" style="color:#9E4765;text-decoration:none;font-weight:500;">${safeEmail}</a>${
+                                safePhone ? ` &bull; ${safePhone}` : ""
+                              }`
+                            : safePhone
+                              ? safePhone
+                              : `<span style="color:#8A777E;font-style:italic;">Direct contact via WhatsApp / Instagram</span>`
+                        }</td>
                       </tr>
                       <tr>
                         <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Colour Direction</td>

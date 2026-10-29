@@ -51,7 +51,9 @@ describe("Form Configuration & Generated Zod Schemas", () => {
 
     // Check repeatable rows initial row counts (starts with minRows when minRows > 0, or 1 when optional)
     expect(defaults["nine_things_loved"]).toHaveLength(3);
-    expect(defaults["ten_things_she_loves_doing"]).toHaveLength(1);
+    expect(defaults["ten_things_she_loves_doing"]).toHaveLength(3);
+    expect(defaults["top_movies"]).toHaveLength(4);
+    expect(defaults["top_series"]).toHaveLength(4);
     expect(defaults["top_3_perfumes"]).toHaveLength(1);
     expect(defaults["wishlist"]).toHaveLength(1);
     expect(defaults["songs"]).toHaveLength(3);
@@ -101,12 +103,12 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         customer_name: "Amara Okafor",
         relationship: "Best friend",
         her_name: "Zuri Mwangi",
-        her_nickname: "",
+        her_nickname: "Zuzu",
         birthday_date: "2001-11-15",
         age_turning: 25,
         colour_theme: "Other",
         other_colour_theme: "   ",
-        cover_headline: "",
+        cover_headline: "Turning 25 in Style",
       });
 
       expect(result.success).toBe(false);
@@ -121,12 +123,12 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         customer_name: "Amara Okafor",
         relationship: "Best friend",
         her_name: "Zuri Mwangi",
-        her_nickname: "",
+        her_nickname: "Zuzu",
         birthday_date: "2001-11-15",
         age_turning: 25,
         colour_theme: "Other",
         other_colour_theme: "Champagne gold and emerald",
-        cover_headline: "",
+        cover_headline: "Turning 25 in Style",
       });
 
       expect(result.success).toBe(true);
@@ -137,9 +139,11 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         customer_name: "Amara",
         relationship: "Sister",
         her_name: "Zuri",
+        her_nickname: "Zuzu",
         birthday_date: "2001-11-15",
         age_turning: 0,
         colour_theme: "Black and white",
+        cover_headline: "Turning 25",
       });
       expect(zeroResult.success).toBe(false);
 
@@ -147,9 +151,11 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         customer_name: "Amara",
         relationship: "Sister",
         her_name: "Zuri",
+        her_nickname: "Zuzu",
         birthday_date: "2001-11-15",
         age_turning: 25.5,
         colour_theme: "Black and white",
+        cover_headline: "Turning 25",
       });
       expect(floatResult.success).toBe(false);
     });
@@ -158,17 +164,34 @@ describe("Form Configuration & Generated Zod Schemas", () => {
   describe("Page 2: RepeatableRows min/max and character limits", () => {
     const page2Schema = buildPageZodSchema(FORM_PAGES[1]!);
 
+    const validPage2Base = {
+      how_did_you_meet: "We met at university orientation week back in 2018.",
+      how_long_known: "6 wonderful years",
+      what_she_means_to_you:
+        "She has been my anchor and my biggest cheerleader through every season of life.",
+      three_words_describe_her: "Warm, brilliant, unstoppable",
+      what_makes_her_different: "Her radiant laughter and unmatched empathy.",
+      her_job_studies_passions: "Interior design and sustainable fashion.",
+      nine_things_loved: [
+        { sentence: "Her infectious laugh" },
+        { sentence: "Her generosity" },
+        { sentence: "Her impeccable taste in music" },
+      ],
+      ten_things_she_loves_doing: [
+        { activity: "Saturday pilates class" },
+        { activity: "Iced matcha lattes" },
+        { activity: "Hosting weekend dinner parties" },
+      ],
+    };
+
     it("fails when nine_things_loved has fewer than 3 filled rows", () => {
       const result = page2Schema.safeParse({
-        what_she_means_to_you:
-          "She has been my anchor and my biggest cheerleader through every season.",
-        three_words_describe_her: "Warm, brilliant, unstoppable",
+        ...validPage2Base,
         nine_things_loved: [
           { sentence: "Her infectious laugh" },
           { sentence: "Her generosity" },
           { sentence: "" },
         ],
-        ten_things_she_loves_doing: [],
       });
 
       expect(result.success).toBe(false);
@@ -179,11 +202,9 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       }
     });
 
-    it("passes when nine_things_loved has at least 3 filled rows (even with empty trailing rows)", () => {
+    it("passes when nine_things_loved and ten_things_she_loves_doing have at least 3 filled rows", () => {
       const result = page2Schema.safeParse({
-        what_she_means_to_you:
-          "She has been my anchor and my biggest cheerleader through every season.",
-        three_words_describe_her: "Warm, brilliant, unstoppable",
+        ...validPage2Base,
         nine_things_loved: [
           { sentence: "Her infectious laugh" },
           { sentence: "Her generosity" },
@@ -191,7 +212,12 @@ describe("Form Configuration & Generated Zod Schemas", () => {
           { sentence: "" },
           { sentence: "" },
         ],
-        ten_things_she_loves_doing: [{ activity: "" }],
+        ten_things_she_loves_doing: [
+          { activity: "Saturday pilates class" },
+          { activity: "Iced matcha lattes" },
+          { activity: "Hosting weekend dinner parties" },
+          { activity: "" },
+        ],
       });
 
       expect(result.success).toBe(true);
@@ -199,15 +225,75 @@ describe("Form Configuration & Generated Zod Schemas", () => {
 
     it("fails when what_she_means_to_you is shorter than 20 characters", () => {
       const result = page2Schema.safeParse({
+        ...validPage2Base,
         what_she_means_to_you: "Too short",
-        three_words_describe_her: "Warm, brilliant, kind",
-        nine_things_loved: [
-          { sentence: "One" },
-          { sentence: "Two" },
-          { sentence: "Three" },
-        ],
       });
 
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("Page 3: Her Favourites & 4 Movies / 4 Series Validation", () => {
+    const page3Schema = buildPageZodSchema(FORM_PAGES[2]!);
+
+    const validPage3 = {
+      favourite_drink: "Iced vanilla matcha",
+      favourite_sweet_treat: "Pistachio croissant",
+      favourite_meal: "Prawn linguine",
+      dream_destination: "Amalfi Coast",
+      favourite_beach_or_holiday_spot: "Diani Beach",
+      favourite_hobby: "Pottery and floral design",
+      favourite_flowers: "Blush peonies",
+      favourite_colours: "Rose and sage",
+      favourite_book_or_genre: "Literary fiction",
+      favourite_film_genre: "2000s rom-coms",
+      top_movies: [
+        { title: "The Devil Wears Prada" },
+        { title: "How to Lose a Guy in 10 Days" },
+        { title: "Legally Blonde" },
+        { title: "13 Going on 30" },
+      ],
+      top_series: [
+        { title: "Sex and the City" },
+        { title: "Bridgerton" },
+        { title: "Gossip Girl" },
+        { title: "The Crown" },
+      ],
+    };
+
+    it("passes when all favourite fields and exactly 4 movies and 4 series are filled", () => {
+      const result = page3Schema.safeParse(validPage3);
+      expect(result.success).toBe(true);
+    });
+
+    it("fails when top_movies has fewer than 4 filled rows", () => {
+      const result = page3Schema.safeParse({
+        ...validPage3,
+        top_movies: [
+          { title: "The Devil Wears Prada" },
+          { title: "How to Lose a Guy in 10 Days" },
+          { title: "Legally Blonde" },
+          { title: "" },
+        ],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.issues.some((i) => i.path.includes("top_movies"))
+        ).toBe(true);
+      }
+    });
+
+    it("fails when top_series has fewer than 4 filled rows", () => {
+      const result = page3Schema.safeParse({
+        ...validPage3,
+        top_series: [
+          { title: "Sex and the City" },
+          { title: "" },
+          { title: "" },
+          { title: "" },
+        ],
+      });
       expect(result.success).toBe(false);
     });
   });
@@ -291,7 +377,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
     });
   });
 
-  describe("Phone Normalisation & Page 9 Validation", () => {
+  describe("Phone Normalisation & Page 9 (Messages Optionality)", () => {
     it("normalises Kenyan local numbers (+254 default) and international numbers to E.164", () => {
       const keLocal = normalizePhoneToE164("0712 345 678", "KE");
       expect(keLocal).toEqual({ valid: true, e164: "+254712345678" });
@@ -306,30 +392,22 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       expect(invalid.valid).toBe(false);
     });
 
-    it("validates Page 9 email, phone E.164 transform, and permission checkbox", () => {
+    it("treats Page 9 messages_from_loved_ones as strictly optional", () => {
       const page9Schema = buildPageZodSchema(FORM_PAGES[8]!);
 
+      // Empty is valid
+      const emptyResult = page9Schema.safeParse({
+        messages_from_loved_ones: [],
+      });
+      expect(emptyResult.success).toBe(true);
+
+      // Populated with entries is valid
       const validResult = page9Schema.safeParse({
         messages_from_loved_ones: [
           { name: "Chloe", note: "So proud of the woman you are becoming!" },
         ],
-        email: "amara@example.com",
-        phone_e164: "0712 345 678",
-        permission_consent: true,
       });
-
       expect(validResult.success).toBe(true);
-      if (validResult.success) {
-        expect(validResult.data.phone_e164).toBe("+254712345678");
-      }
-
-      const unconsentedResult = page9Schema.safeParse({
-        messages_from_loved_ones: [],
-        email: "amara@example.com",
-        phone_e164: "+254712345678",
-        permission_consent: false,
-      });
-      expect(unconsentedResult.success).toBe(false);
     });
   });
 
@@ -353,9 +431,11 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       customer_name: "---",
       relationship: "Sister",
       her_name: "Zuri Mwangi",
+      her_nickname: "Zuzu",
       birthday_date: "2001-11-15",
       age_turning: 25,
       colour_theme: "Pink and girly",
+      cover_headline: "Turning 25",
     });
     expect(symbolOnlyResult.success).toBe(false);
   });

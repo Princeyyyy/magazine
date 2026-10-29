@@ -275,8 +275,18 @@ async function seed() {
         favourite_colours: "Rosewater pink, champagne, espresso",
         favourite_book_or_genre: "Everything I Know About Love by Dolly Alderton",
         favourite_film_genre: "Classic 2000s rom-coms",
-        favourite_tv_shows_and_movies:
-          "The Devil Wears Prada, Sex and the City, Bridgerton, How to Lose a Guy in 10 Days",
+        top_movies: [
+          { title: "The Devil Wears Prada" },
+          { title: "How to Lose a Guy in 10 Days" },
+          { title: "Legally Blonde" },
+          { title: "13 Going on 30" },
+        ],
+        top_series: [
+          { title: "Sex and the City" },
+          { title: "Bridgerton" },
+          { title: "Gossip Girl" },
+          { title: "The Crown" },
+        ],
         top_3_perfumes: [
           {
             perfume_name: "Parfums de Marly Delina Exclusif",

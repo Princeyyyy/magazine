@@ -32,7 +32,20 @@ export function RepeatableRowsField({
   rowErrors,
   gender = "Female",
 }: RepeatableRowsFieldProps) {
-  const safeRows: Record<string, string>[] = Array.isArray(rows) ? rows : [];
+  const minRequiredCount = Math.max(field.minRows, field.initialRows);
+  const safeRows: Record<string, string>[] = React.useMemo(() => {
+    const list = Array.isArray(rows) ? [...rows] : [];
+    if (minRequiredCount > 0 && list.length < minRequiredCount) {
+      const emptyRow: Record<string, string> = {};
+      for (const sf of field.subFields) {
+        emptyRow[sf.key] = "";
+      }
+      while (list.length < minRequiredCount) {
+        list.push({ ...emptyRow });
+      }
+    }
+    return list;
+  }, [rows, minRequiredCount, field.subFields]);
 
   const filledRowsCount = safeRows.filter((row) =>
     field.subFields.every((sf) => (row[sf.key] ?? "").trim().length > 0)
@@ -87,7 +100,9 @@ export function RepeatableRowsField({
                   : "bg-[#F9F0F4] text-[#873954] border-[#EAD4DF]"
               )}
             >
-              {filledRowsCount} of {field.minRows} minimum
+              {field.minRows === field.maxRows
+                ? `${filledRowsCount} of ${field.minRows} required`
+                : `${filledRowsCount} of ${field.minRows} minimum`}
             </span>
           )}
         </div>
