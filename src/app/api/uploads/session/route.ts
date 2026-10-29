@@ -8,6 +8,46 @@ import { handleApiError, getClientIp } from "@/lib/api-response";
 import { checkRateLimit } from "@/lib/security";
 import { NotFoundError, RateLimitError, ValidationError } from "@/lib/errors";
 
+const folderCreationLocks = new Map<string, Promise<string>>();
+
+async function getOrCreateOrderDriveFolder(orderId: string): Promise<string> {
+  const existingLock = folderCreationLocks.get(orderId);
+  if (existingLock) {
+    return existingLock;
+  }
+
+  const promise = (async () => {
+    try {
+      const freshOrder = await db.query.orders.findFirst({
+        where: eq(orders.id, orderId),
+      });
+      if (!freshOrder) {
+        throw new NotFoundError("Order draft");
+      }
+      if (freshOrder.driveFolderId) {
+        return freshOrder.driveFolderId;
+      }
+
+      const storage = getPhotoStorage();
+      const folderLabel = `${freshOrder.herName || "Magazine Order"} - ${freshOrder.reference}`;
+      const newFolderId = await storage.createOrderFolder(
+        freshOrder.id,
+        folderLabel
+      );
+      await db
+        .update(orders)
+        .set({ driveFolderId: newFolderId, updatedAt: new Date() })
+        .where(eq(orders.id, freshOrder.id));
+      return newFolderId;
+    } finally {
+      folderCreationLocks.delete(orderId);
+    }
+  })();
+
+  folderCreationLocks.set(orderId, promise);
+  return promise;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
@@ -69,16 +109,9 @@ export async function POST(req: NextRequest) {
 
     const storage = getPhotoStorage();
 
-    // Ensure order folder exists before creating upload session
-    let driveFolderId = order.driveFolderId;
-    if (!driveFolderId) {
-      const folderLabel = `${order.herName || "Her"} - ${order.reference}`;
-      driveFolderId = await storage.createOrderFolder(order.id, folderLabel);
-      await db
-        .update(orders)
-        .set({ driveFolderId, updatedAt: new Date() })
-        .where(eq(orders.id, order.id));
-    }
+    // Ensure order folder exists (race-safe when uploading 15 photos at once)
+    const driveFolderId =
+      order.driveFolderId || (await getOrCreateOrderDriveFolder(order.id));
 
     const origin = req.headers.get("origin") ?? undefined;
     const session = await storage.createUploadSession(

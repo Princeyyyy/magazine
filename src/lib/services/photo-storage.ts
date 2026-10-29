@@ -37,6 +37,8 @@ export interface StoredPhotoInfo {
 export interface PhotoStorageAdapter {
   readonly providerName: "local" | "drive";
   createOrderFolder(orderId: string, label: string): Promise<string>;
+  renameOrderFolder(driveFolderId: string, newLabel: string): Promise<void>;
+  saveOrderManifest(driveFolderId: string, fileName: string, content: string): Promise<void>;
   getFolderUrl(orderId: string, driveFolderId?: string | null): Promise<string>;
   createUploadSession(
     orderId: string,
@@ -99,6 +101,23 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
       JSON.stringify({ orderId, label, createdAt: new Date().toISOString() }, null, 2)
     );
     return `local-folder:${orderId}`;
+  }
+
+  async renameOrderFolder(driveFolderId: string, newLabel: string): Promise<void> {
+    const orderId = driveFolderId.replace(/^local-folder:/, "");
+    const dir = this.getOrderDir(orderId);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, "_folder_meta.json"),
+      JSON.stringify({ orderId, label: newLabel, updatedAt: new Date().toISOString() }, null, 2)
+    );
+  }
+
+  async saveOrderManifest(driveFolderId: string, fileName: string, content: string): Promise<void> {
+    const orderId = driveFolderId.replace(/^local-folder:/, "");
+    const dir = this.getOrderDir(orderId);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, fileName), content, "utf-8");
   }
 
   async getFolderUrl(orderId: string): Promise<string> {
@@ -345,6 +364,39 @@ export class DriveStorage implements PhotoStorageAdapter {
       throw new Error("Google Drive did not return a folder ID.");
     }
     return res.data.id;
+  }
+
+  async renameOrderFolder(driveFolderId: string, newLabel: string): Promise<void> {
+    if (!driveFolderId || driveFolderId.startsWith("local-folder:")) return;
+    const drive = this.getDriveClient();
+    await drive.files
+      .update({
+        fileId: driveFolderId,
+        requestBody: { name: newLabel },
+      })
+      .catch(() => {});
+  }
+
+  async saveOrderManifest(
+    driveFolderId: string,
+    fileName: string,
+    content: string
+  ): Promise<void> {
+    if (!driveFolderId || driveFolderId.startsWith("local-folder:")) return;
+    const drive = this.getDriveClient();
+    await drive.files
+      .create({
+        requestBody: {
+          name: fileName,
+          mimeType: "text/markdown",
+          parents: [driveFolderId],
+        },
+        media: {
+          mimeType: "text/markdown",
+          body: content,
+        },
+      })
+      .catch(() => {});
   }
 
   async getFolderUrl(_orderId: string, driveFolderId?: string | null): Promise<string> {

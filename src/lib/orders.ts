@@ -346,19 +346,58 @@ export async function submitOrder(
       ? `Other (${String(validData["other_colour_theme"])})`
       : String(validData["colour_theme"] || "");
 
-  // Ensure Drive / Storage folder is created: "{Her full name} - {order reference}"
+  // Ensure Drive / Storage folder is created or renamed to "{Her full name} - {order reference}"
+  // and upload a complete Order Brief & Photo Captions manifest inside the Drive folder
   let driveFolderId = existingOrder.driveFolderId;
   const storage = getPhotoStorage();
-  if (!driveFolderId) {
-    try {
-      const folderLabel = `${herName} - ${existingOrder.reference}`;
+  const folderLabel = `${herName} - ${existingOrder.reference}`;
+  try {
+    if (!driveFolderId) {
       driveFolderId = await storage.createOrderFolder(
         existingOrder.id,
         folderLabel
       );
-    } catch (err) {
-      console.error("Failed to create order folder on submit:", err);
+    } else {
+      await storage.renameOrderFolder(driveFolderId, folderLabel);
     }
+
+    if (driveFolderId) {
+      const coverPhoto =
+        hydrated.photos.find((p) => p.isCover) ?? hydrated.photos[0];
+      const manifestLines: string[] = [
+        `# Custom Magazine Order Brief — ${existingOrder.reference}`,
+        ``,
+        `- **Featured Star:** ${herName}`,
+        `- **Ordered By:** ${customerName} (${String(validData["relationship"] || "")})`,
+        `- **Customer Email:** ${email}`,
+        `- **Customer Phone:** ${phoneE164}`,
+        `- **Birthday & Age Turning:** ${String(validData["birthday_date"] || "")} (Turning ${String(validData["age_turning"] || "")})`,
+        `- **Colour Direction:** ${colourTheme}`,
+        `- **Cover Headline Suggestion:** ${String(validData["cover_headline"] || "(None)")}`,
+        `- **Selected Cover Photo:** ${coverPhoto ? coverPhoto.originalName : "(First photo)"}`,
+        ``,
+        `## Uploaded Photos & Captions (${hydrated.photos.length} Photos)`,
+        ``,
+        ...hydrated.photos.map(
+          (p, i) =>
+            `${i + 1}. **${p.originalName}**${p.isCover ? " [COVER PHOTO]" : ""} — Caption: ${p.caption || "(no caption)"}`
+        ),
+        ``,
+        `## Full Questionnaire Answers`,
+        ``,
+        `\`\`\`json`,
+        JSON.stringify(validData, null, 2),
+        `\`\`\``,
+      ];
+
+      await storage.saveOrderManifest(
+        driveFolderId,
+        `Order-Brief-${existingOrder.reference}.md`,
+        manifestLines.join("\n")
+      );
+    }
+  } catch (err) {
+    console.error("Failed to sync order folder or manifest on submit:", err);
   }
 
   const now = new Date();
