@@ -1,7 +1,7 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import { desc } from "drizzle-orm";
-import { getAuthenticatedAdminEmail } from "@/auth";
+import { getAuthenticatedAdminEmail, isSuperAdminEmail } from "@/auth";
 import { getServiceModeSummary } from "@/env";
 import { db, ensureDbReady } from "@/db";
 import { devOutbox } from "@/db/schema";
@@ -11,6 +11,9 @@ export default async function AdminSettingsPage() {
   const adminEmail = await getAuthenticatedAdminEmail();
   if (!adminEmail) {
     redirect("/admin/login");
+  }
+  if (!isSuperAdminEmail(adminEmail)) {
+    redirect("/admin");
   }
 
   await ensureDbReady();

@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { getAuthenticatedAdminEmail } from "@/auth";
+import { getAuthenticatedAdminEmail, isSuperAdminEmail } from "@/auth";
 import { AdminSignOutButton } from "@/components/admin/admin-signout-button";
 import { BrandLogoMark } from "@/components/icons/SectionIcons";
 
@@ -10,6 +10,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const adminEmail = await getAuthenticatedAdminEmail();
+  const isSuperAdmin = isSuperAdminEmail(adminEmail);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FCF9F7]">
@@ -36,12 +37,14 @@ export default async function AdminLayout({
               >
                 Orders
               </Link>
-              <Link
-                href="/admin/settings"
-                className="hover:text-[#9E4765] transition-colors"
-              >
-                Settings &amp; Services
-              </Link>
+              {isSuperAdmin && (
+                <Link
+                  href="/admin/settings"
+                  className="hover:text-[#9E4765] transition-colors"
+                >
+                  Settings &amp; Services
+                </Link>
+              )}
               <Link
                 href="/"
                 className="hover:text-[#9E4765] transition-colors"

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   FORM_PAGES,
@@ -129,11 +130,18 @@ function hasAnySavedProgress(
   return false;
 }
 
-export function MagazineWizard() {
+interface MagazineWizardProps {
+  isAdmin?: boolean;
+}
+
+export function MagazineWizard({
+  isAdmin: initialIsAdmin = false,
+}: MagazineWizardProps = {}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const resumeTokenParam = searchParams.get("resume");
 
+  const [isAdmin, setIsAdmin] = useState<boolean>(initialIsAdmin);
   const [isResumingFromUrl, setIsResumingFromUrl] = useState(
     Boolean(resumeTokenParam)
   );
@@ -255,6 +263,7 @@ export function MagazineWizard() {
 
         const data = (await res.json()) as {
           isDevMode?: boolean;
+          isAdmin?: boolean;
           draft?: {
             draftToken: string;
             reference: string;
@@ -268,6 +277,9 @@ export function MagazineWizard() {
 
         if (typeof data.isDevMode === "boolean") {
           setIsDevMode(data.isDevMode);
+        }
+        if (typeof data.isAdmin === "boolean") {
+          setIsAdmin(data.isAdmin);
         }
 
         // If token was invalid or pruned from database, reset storage and show clean welcome
@@ -600,7 +612,7 @@ export function MagazineWizard() {
   };
 
   const handleNextPage = async () => {
-    if (!validateCurrentPage()) {
+    if (!isAdmin && !validateCurrentPage()) {
       showEditorialToast(
         "A quick detail needed",
         "Please check the highlighted field above before continuing.",
@@ -641,7 +653,7 @@ export function MagazineWizard() {
   };
 
   const handleJumpToStep = (targetIdx: number) => {
-    const canJump = isDevMode || targetIdx <= highestUnlockedStep;
+    const canJump = isDevMode || isAdmin || targetIdx <= highestUnlockedStep;
     if (!canJump) return;
     void persistDraftNow();
     setFieldErrors({});
@@ -1137,6 +1149,26 @@ export function MagazineWizard() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
+      {/* Admin Inspection Mode Banner */}
+      {isAdmin && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E8D1DC] bg-[#FAF0F4] px-4 py-3 text-xs text-[#7A2E48] shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="font-semibold uppercase tracking-wider text-[10px] bg-[#9E4765] text-white px-2 py-0.5 rounded-full shadow-2xs">
+              Admin Mode
+            </span>
+            <span className="font-medium">
+              All 9 chapters &amp; review unlocked. You can jump directly to any section unobstructed.
+            </span>
+          </div>
+          <Link
+            href="/admin"
+            className="text-xs font-semibold text-[#9E4765] hover:text-[#7A2E48] hover:underline"
+          >
+            Editorial Desk &rarr;
+          </Link>
+        </div>
+      )}
+
       {/* Sleek Wide Editorial Progress Bar (All Sections on One Line) */}
       <div className="rounded-2xl border border-[#EFE6E0] bg-white/95 backdrop-blur-md px-4 sm:px-5 py-4 shadow-[0_4px_24px_-8px_rgba(31,22,25,0.05)] space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1218,7 +1250,7 @@ export function MagazineWizard() {
         <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-1 pt-1">
           {FORM_PAGES.map((p, idx) => {
             const isCurrent = idx === currentStep;
-            const isUnlocked = isDevMode || idx <= highestUnlockedStep;
+            const isUnlocked = isDevMode || isAdmin || idx <= highestUnlockedStep;
             const isCompleted = idx < currentStep || idx < highestUnlockedStep;
             const adaptedTitle = adaptCopyByGender(p.title, selectedGender);
             const SectionIcon = getSectionIcon(p.id);
@@ -1263,7 +1295,7 @@ export function MagazineWizard() {
           })}
 
           {/* Review Tab Pill */}
-          {(isDevMode || highestUnlockedStep >= totalSteps) && (
+          {(isDevMode || isAdmin || highestUnlockedStep >= totalSteps) && (
             <button
               type="button"
               onClick={() => handleJumpToStep(totalSteps)}

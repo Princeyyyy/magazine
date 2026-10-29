@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDraftByToken, saveDraftAnswers } from "@/lib/orders";
+import { getAuthenticatedAdminEmail } from "@/auth";
 import { handleApiError, getClientIp } from "@/lib/api-response";
 import { checkRateLimit } from "@/lib/security";
 import { RateLimitError, ValidationError } from "@/lib/errors";
@@ -40,7 +41,12 @@ export async function POST(req: NextRequest) {
       ? await getDraftByToken(body.token.trim())
       : null;
     const { isDevMode } = getServiceModeSummary();
-    return NextResponse.json({ draft, isDevMode });
+    const adminEmail = await getAuthenticatedAdminEmail();
+    return NextResponse.json({
+      draft,
+      isDevMode,
+      isAdmin: Boolean(adminEmail),
+    });
   } catch (error) {
     return handleApiError(error);
   }

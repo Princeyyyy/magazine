@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
-import { getAuthenticatedAdminEmail } from "@/auth";
+import { getAuthenticatedAdminEmail, isSuperAdminEmail } from "@/auth";
 import { db, ensureDbReady } from "@/db";
 import { orders } from "@/db/schema";
 import { env } from "@/env";
@@ -13,8 +13,8 @@ import { UnauthorizedError, ValidationError } from "@/lib/errors";
 export async function POST(req: NextRequest) {
   try {
     const adminEmail = await getAuthenticatedAdminEmail();
-    if (!adminEmail) {
-      throw new UnauthorizedError();
+    if (!adminEmail || !isSuperAdminEmail(adminEmail)) {
+      throw new UnauthorizedError("Settings and system diagnostics are restricted to the primary administrator.");
     }
 
     const body = (await req.json()) as {

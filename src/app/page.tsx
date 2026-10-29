@@ -1,12 +1,16 @@
 import React, { Suspense } from "react";
 import Link from "next/link";
+import { getAuthenticatedAdminEmail } from "@/auth";
 import { MagazineWizard } from "@/components/wizard/magazine-wizard";
 import {
   BrandLogoMark,
   BrandLogoTransparent,
 } from "@/components/icons/SectionIcons";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const adminEmail = await getAuthenticatedAdminEmail();
+  const isAdmin = Boolean(adminEmail);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FCF9F7]">
       {/* Subtle Ambient Top Glow */}
@@ -26,17 +30,34 @@ export default function HomePage() {
             <span>Custom Magazine</span>
           </Link>
 
-          <div className="flex items-center gap-4 text-xs text-[#7A686E]">
-            <span className="hidden sm:inline italic font-serif text-sm text-[#8C7A80]">
-              The Bespoke Issue
-            </span>
-            <span className="hidden sm:inline text-[#E6DAD3]">&bull;</span>
-            <Link
-              href="/admin"
-              className="rounded-full border border-[#EAE0DA] bg-[#FCF9F7] px-3.5 py-1.5 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-            >
-              Editorial Desk
-            </Link>
+          <div className="flex items-center gap-3 text-xs text-[#7A686E]">
+            {isAdmin ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-[#F6EBF0] border border-[#E8D1DC] px-2.5 py-1 text-[11px] font-medium text-[#7A2E48]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#9E4765]" />
+                  Admin Navigation Mode
+                </span>
+                <Link
+                  href="/admin"
+                  className="rounded-full border border-[#9E4765] bg-[#9E4765] text-white px-3.5 py-1.5 text-xs font-medium hover:bg-[#7A2E48] transition-colors"
+                >
+                  Return to Editorial Desk
+                </Link>
+              </div>
+            ) : (
+              <>
+                <span className="hidden sm:inline italic font-serif text-sm text-[#8C7A80]">
+                  The Bespoke Issue
+                </span>
+                <span className="hidden sm:inline text-[#E6DAD3]">&bull;</span>
+                <Link
+                  href="/admin"
+                  className="rounded-full border border-[#EAE0DA] bg-[#FCF9F7] px-3.5 py-1.5 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
+                >
+                  Editorial Desk
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -50,7 +71,7 @@ export default function HomePage() {
             </div>
           }
         >
-          <MagazineWizard />
+          <MagazineWizard isAdmin={isAdmin} />
         </Suspense>
       </main>
 

@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, asc, sql } from "drizzle-orm";
-import { getAuthenticatedAdminEmail } from "@/auth";
+import { getAuthenticatedAdminEmail, isSuperAdminEmail } from "@/auth";
 import { db, ensureDbReady } from "@/db";
 import { orders, photos, orderStatusEnum, type OrderStatus } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +76,7 @@ export default async function AdminOrdersPage({
   if (!adminEmail) {
     redirect("/admin/login");
   }
+  const isSuperAdmin = isSuperAdminEmail(adminEmail);
 
   await ensureDbReady();
   const params = await searchParams;
@@ -162,9 +163,11 @@ export default async function AdminOrdersPage({
           </h1>
         </div>
 
-        <Button asChild variant="outline" size="sm">
-          <Link href="/admin/settings">Configure Services</Link>
-        </Button>
+        {isSuperAdmin && (
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/settings">Configure Services</Link>
+          </Button>
+        )}
       </div>
 
       {/* Search & Filter Bar */}

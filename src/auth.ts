@@ -123,6 +123,8 @@ export const authConfig: NextAuthConfig = {
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
 
+export { SUPER_ADMIN_EMAIL, isSuperAdminEmail } from "@/env";
+
 /**
  * Helper used by Admin Server Components and Admin API Routes to get the authenticated admin email.
  */

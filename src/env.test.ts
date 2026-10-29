@@ -5,6 +5,8 @@ import {
   getAdminAllowlist,
   getPrimaryAdminEmail,
   getCompletionCcEmails,
+  isSuperAdminEmail,
+  SUPER_ADMIN_EMAIL,
 } from "./env";
 
 describe("Environment Validation & Service Mode Detection", () => {
@@ -70,5 +72,16 @@ describe("Environment Validation & Service Mode Detection", () => {
       "alice@example.com",
       "bob@example.com",
     ]);
+  });
+
+  it("strictly restricts super admin privileges to princemumo80@gmail.com", () => {
+    expect(SUPER_ADMIN_EMAIL).toBe("princemumo80@gmail.com");
+    expect(isSuperAdminEmail("princemumo80@gmail.com")).toBe(true);
+    expect(isSuperAdminEmail("  Princemumo80@Gmail.com  ")).toBe(true);
+    expect(isSuperAdminEmail("barbaratrizer60@gmail.com")).toBe(false);
+    expect(isSuperAdminEmail("other@admin.com")).toBe(false);
+    expect(isSuperAdminEmail("")).toBe(false);
+    expect(isSuperAdminEmail(null)).toBe(false);
+    expect(isSuperAdminEmail(undefined)).toBe(false);
   });
 });

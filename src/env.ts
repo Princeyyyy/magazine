@@ -141,6 +141,15 @@ export function getCompletionCcEmails(currentEnv: Env = env): string[] {
 }
 
 /**
+ * The single designated super administrator with exclusive access to settings & service configuration.
+ */
+export const SUPER_ADMIN_EMAIL = "princemumo80@gmail.com";
+
+export function isSuperAdminEmail(email?: string | null): boolean {
+  return email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
+}
+
+/**
  * Inspects which adapters are running in Live mode vs Local/Mock mode.
  */
 export function getServiceModeSummary(currentEnv: Env = env) {
