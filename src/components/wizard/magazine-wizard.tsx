@@ -33,7 +33,6 @@ import {
   Bookmark,
   Send,
   Copy,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -892,12 +891,6 @@ export function MagazineWizard() {
             {activePage && (
               <span className="text-xs text-[#8C7A80] hidden sm:inline">
                 &mdash; {adaptCopyByGender(activePage.title, selectedGender)}
-              </span>
-            )}
-            {isDevMode && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#FFFBEB] border border-[#FDE68A] px-2.5 py-0.5 text-[10px] font-medium text-[#92400E]">
-                <Sparkles className="h-2.5 w-2.5" />
-                Dev Mode: Jump to any section
               </span>
             )}
           </div>

@@ -18,6 +18,7 @@ describe("Environment Validation & Service Adapter Fallback Selection", () => {
 
   it("selects live adapters when credentials are provided in environment", () => {
     const config = parseEnv({
+      NODE_ENV: "production",
       DATABASE_URL: "postgresql://user:pass@ep-cool.us-east-2.aws.neon.tech/neondb",
       GOOGLE_OAUTH_CLIENT_ID: "client-id",
       GOOGLE_OAUTH_CLIENT_SECRET: "client-secret",

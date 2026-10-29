@@ -122,7 +122,9 @@ export function getServiceModeSummary(currentEnv: EnvConfig = env) {
 
   const isNeonFunctionLive = Boolean(currentEnv.NEON_FUNCTION_HELLO_BASE_URL);
 
-  const isDevMode = !isDriveLive || !isMailerLive || !isDatabaseRemote;
+  const isDevMode =
+    currentEnv.NODE_ENV !== "production" &&
+    (!isDriveLive || !isMailerLive || !isDatabaseRemote);
 
   return {
     isDevMode,

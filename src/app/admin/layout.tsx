@@ -1,8 +1,6 @@
 import React from "react";
 import Link from "next/link";
 import { getAuthenticatedAdminEmail } from "@/auth";
-import { getServiceModeSummary } from "@/env";
-import { Badge } from "@/components/ui/badge";
 import { AdminSignOutButton } from "@/components/admin/admin-signout-button";
 import { BrandLogoMark } from "@/components/icons/SectionIcons";
 
@@ -12,7 +10,6 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const adminEmail = await getAuthenticatedAdminEmail();
-  const modeSummary = getServiceModeSummary();
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FCF9F7]">
@@ -29,12 +26,6 @@ export default async function AdminLayout({
                 Editorial Desk
               </span>
             </Link>
-
-            {modeSummary.isDevMode && (
-              <Badge variant="dev" className="rounded-full">
-                Dev Mode (Local Adapters)
-              </Badge>
-            )}
           </div>
 
           {adminEmail && (

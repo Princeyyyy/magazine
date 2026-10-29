@@ -27,16 +27,9 @@ export default function HomePage() {
           </Link>
 
           <div className="flex items-center gap-4 text-xs text-[#7A686E]">
-            <span className="hidden sm:inline italic font-serif text-sm text-[#8C7A80]">
+            <span className="italic font-serif text-sm text-[#8C7A80]">
               The Bespoke Issue
             </span>
-            <span className="hidden sm:inline text-[#E6DAD3]">&bull;</span>
-            <Link
-              href="/admin"
-              className="rounded-full border border-[#EAE0DA] bg-[#FCF9F7] px-3.5 py-1.5 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-            >
-              Editorial Desk
-            </Link>
           </div>
         </div>
       </header>

@@ -1,7 +1,6 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import { getAuthenticatedAdminEmail } from "@/auth";
-import { getAdminAllowlist } from "@/env";
 import { DevAdminLoginForm } from "@/components/admin/dev-admin-login-form";
 import { BrandLogoMark } from "@/components/icons/SectionIcons";
 
@@ -10,8 +9,6 @@ export default async function AdminLoginPage() {
   if (adminEmail) {
     redirect("/admin");
   }
-
-  const allowlist = getAdminAllowlist();
 
   return (
     <div className="mx-auto max-w-md py-16">
@@ -27,19 +24,11 @@ export default async function AdminLoginPage() {
             Sign in to Admin
           </h1>
           <p className="text-xs text-[#7A686E] leading-relaxed">
-            Sign in with your authorized email in{" "}
-            <code className="bg-[#FAF3F0] px-1.5 py-0.5 rounded">
-              ADMIN_EMAILS
-            </code>{" "}
-            and your{" "}
-            <code className="bg-[#FAF3F0] px-1.5 py-0.5 rounded">
-              ADMIN_PASSWORD
-            </code>
-            .
+            Enter your admin email and password to access the Editorial Desk.
           </p>
         </div>
 
-        <DevAdminLoginForm defaultEmail={allowlist[0] || "admin@example.com"} />
+        <DevAdminLoginForm defaultEmail="" />
       </div>
     </div>
   );
