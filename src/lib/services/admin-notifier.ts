@@ -1,6 +1,5 @@
 import { env } from "@/env";
-import { db, ensureDbReady } from "@/db";
-import { messageLog } from "@/db/schema";
+import { ensureDbReady } from "@/db";
 import { getMailer } from "./mailer";
 import {
   renderAdminNewOrderEmail,
@@ -40,14 +39,14 @@ export class StandardAdminNotifier implements AdminNotifierAdapter {
         const text = [
           `New Custom Magazine Order!`,
           `Reference: ${payload.orderReference}`,
-          `Her Name: ${payload.herName}`,
+          `Featured Star: ${payload.herName}`,
           `Ordered By: ${payload.customerName}`,
           `Colour Theme: ${payload.colourTheme}`,
           `Photos: ${payload.photoCount}`,
           `Admin Link: ${payload.adminOrderUrl}`,
         ].join("\n");
 
-        const res = await fetch(
+        await fetch(
           `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
           {
             method: "POST",
@@ -58,34 +57,8 @@ export class StandardAdminNotifier implements AdminNotifierAdapter {
             }),
           }
         );
-
-        if (!res.ok) {
-          const errBody = await res.text();
-          await db.insert(messageLog).values({
-            orderId: payload.orderId,
-            channel: "telegram",
-            template: "telegram_new_order_alert",
-            status: "failed",
-            error: errBody,
-          });
-        } else {
-          await db.insert(messageLog).values({
-            orderId: payload.orderId,
-            channel: "telegram",
-            template: "telegram_new_order_alert",
-            status: "sent",
-            error: null,
-          });
-        }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Telegram API error";
-        await db.insert(messageLog).values({
-          orderId: payload.orderId,
-          channel: "telegram",
-          template: "telegram_new_order_alert",
-          status: "failed",
-          error: msg,
-        });
+        console.error("Telegram notification error:", err);
       }
     }
   }

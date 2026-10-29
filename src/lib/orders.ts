@@ -347,8 +347,9 @@ export async function submitOrder(
       : String(validData["colour_theme"] || "");
 
   // Ensure Drive / Storage folder is created or renamed to "{Her full name} - {order reference}"
-  // and upload a complete Order Brief & Photo Captions manifest inside the Drive folder
+  // and store the direct Google Drive folder URL on the order record
   let driveFolderId = existingOrder.driveFolderId;
+  let driveFolderUrl = existingOrder.driveFolderUrl;
   const storage = getPhotoStorage();
   const folderLabel = `${herName} - ${existingOrder.reference}`;
   try {
@@ -360,44 +361,12 @@ export async function submitOrder(
     } else {
       await storage.renameOrderFolder(driveFolderId, folderLabel);
     }
-
-    if (driveFolderId) {
-      const coverPhoto =
-        hydrated.photos.find((p) => p.isCover) ?? hydrated.photos[0];
-      const manifestLines: string[] = [
-        `# Custom Magazine Order Brief — ${existingOrder.reference}`,
-        ``,
-        `- **Featured Star:** ${herName}`,
-        `- **Ordered By:** ${customerName} (${String(validData["relationship"] || "")})`,
-        `- **Customer Email:** ${email}`,
-        `- **Customer Phone:** ${phoneE164}`,
-        `- **Birthday & Age Turning:** ${String(validData["birthday_date"] || "")} (Turning ${String(validData["age_turning"] || "")})`,
-        `- **Colour Direction:** ${colourTheme}`,
-        `- **Cover Headline Suggestion:** ${String(validData["cover_headline"] || "(None)")}`,
-        `- **Selected Cover Photo:** ${coverPhoto ? coverPhoto.originalName : "(First photo)"}`,
-        ``,
-        `## Uploaded Photos & Captions (${hydrated.photos.length} Photos)`,
-        ``,
-        ...hydrated.photos.map(
-          (p, i) =>
-            `${i + 1}. **${p.originalName}**${p.isCover ? " [COVER PHOTO]" : ""} — Caption: ${p.caption || "(no caption)"}`
-        ),
-        ``,
-        `## Full Questionnaire Answers`,
-        ``,
-        `\`\`\`json`,
-        JSON.stringify(validData, null, 2),
-        `\`\`\``,
-      ];
-
-      await storage.saveOrderManifest(
-        driveFolderId,
-        `Order-Brief-${existingOrder.reference}.md`,
-        manifestLines.join("\n")
-      );
-    }
+    driveFolderUrl = await storage.getFolderUrl(
+      existingOrder.id,
+      driveFolderId
+    );
   } catch (err) {
-    console.error("Failed to sync order folder or manifest on submit:", err);
+    console.error("Failed to sync order folder on submit:", err);
   }
 
   const now = new Date();
@@ -417,6 +386,7 @@ export async function submitOrder(
       email,
       phoneE164,
       driveFolderId,
+      driveFolderUrl,
       consentAt: now,
       submittedAt: now,
       updatedAt: now,

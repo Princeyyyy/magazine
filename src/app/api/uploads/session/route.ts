@@ -34,9 +34,17 @@ async function getOrCreateOrderDriveFolder(orderId: string): Promise<string> {
         freshOrder.id,
         folderLabel
       );
+      const newFolderUrl = await storage.getFolderUrl(
+        freshOrder.id,
+        newFolderId
+      );
       await db
         .update(orders)
-        .set({ driveFolderId: newFolderId, updatedAt: new Date() })
+        .set({
+          driveFolderId: newFolderId,
+          driveFolderUrl: newFolderUrl,
+          updatedAt: new Date(),
+        })
         .where(eq(orders.id, freshOrder.id));
       return newFolderId;
     } finally {

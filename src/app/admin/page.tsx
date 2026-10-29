@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditorialSelect } from "@/components/ui/editorial-select";
-import { Camera, ArrowUpRight, Search } from "lucide-react";
+import { Camera, ArrowUpRight, Search, ExternalLink } from "lucide-react";
 
 interface AdminOrdersPageProps {
   searchParams: Promise<{
@@ -253,10 +253,27 @@ export default async function AdminOrdersPage({
                         {order.colourTheme || "—"}
                       </td>
                       <td className="py-4 px-5">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-[#4A3A40]">
-                          <Camera className="h-3.5 w-3.5 text-[#9E4765]" />
-                          {photoCount}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-[#4A3A40]">
+                            <Camera className="h-3.5 w-3.5 text-[#9E4765]" />
+                            {photoCount}
+                          </span>
+                          {(order.driveFolderUrl || order.driveFolderId) && (
+                            <a
+                              href={
+                                order.driveFolderUrl ||
+                                `https://drive.google.com/drive/folders/${order.driveFolderId}`
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Open order photo folder in Google Drive"
+                              className="inline-flex items-center gap-1 rounded-full border border-[#EAD4DF] bg-[#FDF8FA] px-2 py-0.5 text-[10px] font-medium text-[#9E4765] hover:bg-[#F6EBF0] transition-colors"
+                            >
+                              Drive
+                              <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          )}
+                        </div>
                       </td>
                       <td className="py-4 px-5">
                         <Badge

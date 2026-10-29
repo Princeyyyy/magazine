@@ -4,17 +4,9 @@ import { redirect, notFound } from "next/navigation";
 import { eq, asc, desc } from "drizzle-orm";
 import { getAuthenticatedAdminEmail } from "@/auth";
 import { db, ensureDbReady } from "@/db";
-import {
-  orders,
-  answers,
-  photos,
-  notes,
-  messageLog,
-  statusHistory,
-} from "@/db/schema";
+import { orders, answers, photos, statusHistory } from "@/db/schema";
 import { FORM_PAGES, getDefaultFormValues } from "@/config/form";
 import { getPhotoStorage } from "@/lib/services/photo-storage";
-import { getWhatsAppProvider } from "@/lib/services/whatsapp";
 import { AdminOrderDetailClient } from "@/components/admin/admin-order-detail-client";
 import { ChevronLeft } from "lucide-react";
 
@@ -41,29 +33,13 @@ export default async function AdminOrderDetailPage({
     notFound();
   }
 
-  const [
-    storedAnswers,
-    storedPhotos,
-    storedNotes,
-    storedMessages,
-    storedStatusHistory,
-  ] = await Promise.all([
+  const [storedAnswers, storedPhotos, storedStatusHistory] = await Promise.all([
     db.select().from(answers).where(eq(answers.orderId, order.id)),
     db
       .select()
       .from(photos)
       .where(eq(photos.orderId, order.id))
       .orderBy(asc(photos.sortOrder), asc(photos.uploadedAt)),
-    db
-      .select()
-      .from(notes)
-      .where(eq(notes.orderId, order.id))
-      .orderBy(desc(notes.createdAt)),
-    db
-      .select()
-      .from(messageLog)
-      .where(eq(messageLog.orderId, order.id))
-      .orderBy(desc(messageLog.createdAt)),
     db
       .select()
       .from(statusHistory)
@@ -90,20 +66,9 @@ export default async function AdminOrderDetailPage({
   if (order.consentAt) values["permission_consent"] = true;
 
   const storage = getPhotoStorage();
-  const driveFolderUrl = await storage.getFolderUrl(
-    order.id,
-    order.driveFolderId
-  );
-
-  const wa = getWhatsAppProvider();
-  const openWaChatUrl = order.phoneE164
-    ? wa.buildAdminToCustomerWaLink(
-        order.phoneE164,
-        order.reference,
-        order.herName || "Her",
-        order.customerName || "Customer"
-      )
-    : "";
+  const driveFolderUrl =
+    order.driveFolderUrl ||
+    (await storage.getFolderUrl(order.id, order.driveFolderId));
 
   return (
     <div className="space-y-6">
@@ -133,6 +98,7 @@ export default async function AdminOrderDetailPage({
           email: order.email || "",
           phoneE164: order.phoneE164 || "",
           driveFolderId: order.driveFolderId || "",
+          driveFolderUrl,
           createdAt: order.createdAt.toISOString(),
           submittedAt: order.submittedAt?.toISOString() ?? null,
         }}
@@ -147,20 +113,6 @@ export default async function AdminOrderDetailPage({
           sortOrder: p.sortOrder,
           uploadedAt: p.uploadedAt.toISOString(),
         }))}
-        notes={storedNotes.map((n) => ({
-          id: n.id,
-          adminEmail: n.adminEmail,
-          body: n.body,
-          createdAt: n.createdAt.toISOString(),
-        }))}
-        messageLogs={storedMessages.map((m) => ({
-          id: m.id,
-          channel: m.channel,
-          template: m.template,
-          status: m.status,
-          error: m.error,
-          createdAt: m.createdAt.toISOString(),
-        }))}
         statusHistory={storedStatusHistory.map((sh) => ({
           id: sh.id,
           fromStatus: sh.fromStatus,
@@ -169,7 +121,6 @@ export default async function AdminOrderDetailPage({
           createdAt: sh.createdAt.toISOString(),
         }))}
         driveFolderUrl={driveFolderUrl}
-        openWaChatUrl={openWaChatUrl}
       />
     </div>
   );

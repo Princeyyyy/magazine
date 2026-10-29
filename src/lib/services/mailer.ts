@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 import { env } from "@/env";
 import { db, ensureDbReady } from "@/db";
-import { devOutbox, messageLog } from "@/db/schema";
+import { devOutbox } from "@/db/schema";
 
 export interface SendMailInput {
   orderId?: string;
@@ -37,15 +37,6 @@ export class ConsoleMailer implements MailerAdapter {
         template: input.template,
       });
 
-      if (input.orderId) {
-        await db.insert(messageLog).values({
-          orderId: input.orderId,
-          channel: "email",
-          template: input.template,
-          status: "sent (dev_outbox)",
-          error: null,
-        });
-      }
       return { ok: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save to dev_outbox";
@@ -85,40 +76,12 @@ export class ResendMailer implements MailerAdapter {
       });
 
       if (res.error) {
-        if (input.orderId) {
-          await db.insert(messageLog).values({
-            orderId: input.orderId,
-            channel: "email",
-            template: input.template,
-            status: "failed",
-            error: res.error.message,
-          });
-        }
         return { ok: false, error: res.error.message };
-      }
-
-      if (input.orderId) {
-        await db.insert(messageLog).values({
-          orderId: input.orderId,
-          channel: "email",
-          template: input.template,
-          status: "sent",
-          error: null,
-        });
       }
 
       return { ok: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Resend API error";
-      if (input.orderId) {
-        await db.insert(messageLog).values({
-          orderId: input.orderId,
-          channel: "email",
-          template: input.template,
-          status: "failed",
-          error: msg,
-        });
-      }
       return { ok: false, error: msg };
     }
   }

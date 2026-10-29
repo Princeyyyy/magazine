@@ -11,8 +11,6 @@ import {
   orders,
   answers,
   photos,
-  notes,
-  messageLog,
   statusHistory,
   devOutbox,
 } from "../src/db/schema";
@@ -292,33 +290,12 @@ async function seed() {
       });
     }
 
-    await db.insert(notes).values({
-      orderId: submittedOrder.id,
-      adminEmail: "admin@example.com",
-      body: "All 20 photos checked — high resolution and wonderful lighting. Ready to start cover layout.",
-    });
-
     await db.insert(statusHistory).values({
       orderId: submittedOrder.id,
       fromStatus: "draft",
       toStatus: "submitted",
       adminEmail: "customer_submission",
     });
-
-    await db.insert(messageLog).values([
-      {
-        orderId: submittedOrder.id,
-        channel: "email",
-        template: "customer_order_confirmation",
-        status: "sent (dev_outbox)",
-      },
-      {
-        orderId: submittedOrder.id,
-        channel: "email",
-        template: "admin_new_order_alert",
-        status: "sent (dev_outbox)",
-      },
-    ]);
 
     await db.insert(devOutbox).values({
       orderId: submittedOrder.id,
@@ -405,12 +382,6 @@ async function seed() {
         sortOrder: i,
       });
     }
-
-    await db.insert(notes).values({
-      orderId: inDesignOrder.id,
-      adminEmail: "admin@example.com",
-      body: "Monochrome editorial layout in progress — pages 1 to 6 drafted in InDesign.",
-    });
 
     await db.insert(statusHistory).values([
       {

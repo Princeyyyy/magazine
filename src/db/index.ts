@@ -22,12 +22,6 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
-DO $$ BEGIN
-  CREATE TYPE "public"."message_channel" AS ENUM('email', 'whatsapp', 'telegram');
-EXCEPTION
-  WHEN duplicate_object THEN null;
-END $$;
-
 CREATE TABLE IF NOT EXISTS "orders" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "reference" text NOT NULL UNIQUE,
@@ -44,11 +38,18 @@ CREATE TABLE IF NOT EXISTS "orders" (
   "email" text,
   "phone_e164" text,
   "drive_folder_id" text,
+  "drive_folder_url" text,
   "consent_at" timestamp with time zone,
   "submitted_at" timestamp with time zone,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "drive_folder_url" text;
+UPDATE "orders" SET "drive_folder_url" = 'https://drive.google.com/drive/folders/' || "drive_folder_id" WHERE "drive_folder_id" IS NOT NULL AND "drive_folder_url" IS NULL AND "drive_folder_id" NOT LIKE 'local-%';
+
+DROP TABLE IF EXISTS "notes" CASCADE;
+DROP TABLE IF EXISTS "message_log" CASCADE;
 
 CREATE TABLE IF NOT EXISTS "answers" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -70,24 +71,6 @@ CREATE TABLE IF NOT EXISTS "photos" (
   "is_cover" boolean DEFAULT false NOT NULL,
   "sort_order" integer DEFAULT 0 NOT NULL,
   "uploaded_at" timestamp with time zone DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS "notes" (
-  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "order_id" uuid NOT NULL REFERENCES "orders"("id") ON DELETE CASCADE,
-  "admin_email" text NOT NULL,
-  "body" text NOT NULL,
-  "created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS "message_log" (
-  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "order_id" uuid REFERENCES "orders"("id") ON DELETE CASCADE,
-  "channel" "message_channel" NOT NULL,
-  "template" text NOT NULL,
-  "status" text NOT NULL,
-  "error" text,
-  "created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "dev_outbox" (

@@ -33,6 +33,10 @@ import {
   Bookmark,
   Send,
   Copy,
+  Sparkles,
+  AlertCircle,
+  Loader2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -141,6 +145,34 @@ export function MagazineWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Elegant Editorial Toast Notification
+  const [editorialToast, setEditorialToast] = useState<{
+    title: string;
+    subtitle: string;
+    tone: "default" | "progress" | "warning";
+  } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showEditorialToast = useCallback(
+    (
+      title: string,
+      subtitle: string,
+      tone: "default" | "progress" | "warning" = "default",
+      durationMs = 3600
+    ) => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+      setEditorialToast({ title, subtitle, tone });
+      if (durationMs > 0) {
+        toastTimerRef.current = setTimeout(() => {
+          setEditorialToast(null);
+        }, durationMs);
+      }
+    },
+    []
+  );
+
   const valuesRef = useRef(values);
   valuesRef.current = values;
   const userEditedBeforeInitRef = useRef(false);
@@ -205,7 +237,18 @@ export function MagazineWizard() {
           setValues(data.draft.values);
           // If the user opened an explicit ?resume= link, jump straight to where they left off
           if (resumeTokenParam && computedMaxStep > 0) {
-            setCurrentStep(Math.min(FORM_PAGES.length - 1, computedMaxStep));
+            const targetStep = Math.min(FORM_PAGES.length - 1, computedMaxStep);
+            setCurrentStep(targetStep);
+            const resumedPage = FORM_PAGES[targetStep];
+            showEditorialToast(
+              "Welcome back to your magazine brief",
+              resumedPage
+                ? `Picked up at Chapter ${targetStep + 1}: ${adaptCopyByGender(
+                    resumedPage.title,
+                    String(data.draft.values["subject_gender"] || "Female")
+                  )}`
+                : "Your saved answers and photos have been restored."
+            );
           }
         }
 
@@ -230,7 +273,7 @@ export function MagazineWizard() {
     return () => {
       active = false;
     };
-  }, [resumeTokenParam]);
+  }, [resumeTokenParam, showEditorialToast]);
 
   // Save draft helper
   const persistDraftNow = useCallback(
@@ -345,10 +388,21 @@ export function MagazineWizard() {
 
   const handlePhotosChange = useCallback(
     (nextPhotos: UploadedPhotoItem[]) => {
-      setPhotos(nextPhotos);
+      setPhotos((prevPhotos) => {
+        if (nextPhotos.length > prevPhotos.length) {
+          const addedCount = nextPhotos.length - prevPhotos.length;
+          showEditorialToast(
+            addedCount === 1
+              ? "Photo added to your issue"
+              : `${addedCount} photos added to your issue`,
+            `${nextPhotos.length} of 15 photos saved to your private folder.`
+          );
+        }
+        return nextPhotos;
+      });
       setFieldValue("photos", nextPhotos);
     },
-    [setFieldValue]
+    [setFieldValue, showEditorialToast]
   );
 
   const scrollToFirstInvalidField = (
@@ -428,12 +482,30 @@ export function MagazineWizard() {
 
   const handleNextPage = async () => {
     if (!validateCurrentPage()) {
+      showEditorialToast(
+        "A quick detail needed",
+        "Please check the highlighted field above before continuing.",
+        "warning"
+      );
       return;
     }
     void persistDraftNow();
     const nextIdx = Math.min(FORM_PAGES.length, currentStep + 1);
     setHighestUnlockedStep((prev) => Math.max(prev, nextIdx));
     setCurrentStep(nextIdx);
+    const completedNumber = currentStep + 1;
+    const nextPage = FORM_PAGES[nextIdx];
+    if (nextPage) {
+      showEditorialToast(
+        `Chapter ${completedNumber} saved`,
+        `Up next: ${adaptCopyByGender(nextPage.title, selectedGender)}`
+      );
+    } else {
+      showEditorialToast(
+        "All 9 chapters complete",
+        "Take a moment to review your Final Proof before submitting."
+      );
+    }
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -493,6 +565,10 @@ export function MagazineWizard() {
       setResumeEmailStatus(
         data.message || "I have sent your private resume link to your email."
       );
+      showEditorialToast(
+        "Private resume link sent",
+        `Check ${resumeEmailInput.trim()} whenever you are ready to continue.`
+      );
     } catch {
       setResumeEmailStatus("Could not send resume link. Please try again.");
     }
@@ -502,6 +578,12 @@ export function MagazineWizard() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
+    showEditorialToast(
+      "Sending to the Editorial Desk",
+      "Finalizing your magazine brief and locking in your photos...",
+      "progress",
+      0
+    );
 
     try {
       const res = await fetch("/api/orders/submit", {
@@ -529,11 +611,12 @@ export function MagazineWizard() {
           ?.map((d) => adaptCopyByGender(d.message, selectedGender))
           .slice(0, 3)
           .join(" ");
-        setSubmitError(
+        const errMsg =
           detailText ||
-            data.error?.message ||
-            "Please review your answers and make sure all required fields are complete."
-        );
+          data.error?.message ||
+          "Please review your answers and make sure all required fields are complete.";
+        setSubmitError(errMsg);
+        showEditorialToast("Please review your brief", errMsg, "warning", 5000);
         setIsSubmitting(false);
         return;
       }
@@ -541,13 +624,18 @@ export function MagazineWizard() {
       setOrderReference(data.reference);
       if (data.whatsAppUrl) setWhatsAppUrl(data.whatsAppUrl);
       setOrderStatus("submitted");
+      showEditorialToast(
+        "Magazine brief submitted",
+        `Order ${data.reference} has been received.`
+      );
       router.push(
         `/thank-you?ref=${encodeURIComponent(data.reference)}`
       );
     } catch {
-      setSubmitError(
-        "Something went wrong while submitting your order. Please try again."
-      );
+      const errMsg =
+        "Something went wrong while submitting your order. Please try again.";
+      setSubmitError(errMsg);
+      showEditorialToast("Submission interrupted", errMsg, "warning", 5000);
       setIsSubmitting(false);
     }
   };
@@ -913,6 +1001,12 @@ export function MagazineWizard() {
                 setShowResumeDrawer(nextOpen);
                 setIsBookmarked(true);
                 void persistDraftNow();
+                if (nextOpen) {
+                  showEditorialToast(
+                    "Draft bookmarked for later",
+                    "Copy your private link or email it to yourself to continue anytime."
+                  );
+                }
               }}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer",
@@ -1044,6 +1138,10 @@ export function MagazineWizard() {
                     void navigator.clipboard.writeText(resumeUrl);
                     setIsBookmarked(true);
                     setCopiedResumeLink(true);
+                    showEditorialToast(
+                      "Private resume link copied",
+                      "Keep it somewhere safe to pick up right where you left off."
+                    );
                     setTimeout(() => setCopiedResumeLink(false), 2000);
                   }}
                 >
@@ -1285,6 +1383,50 @@ export function MagazineWizard() {
           </div>
         </form>
       ) : null}
+
+      {/* Subtle Floating Editorial Toast */}
+      {editorialToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 max-w-sm w-full sm:w-auto rounded-2xl border border-[#EFE6E0] bg-white/95 backdrop-blur-md p-4 shadow-[0_16px_45px_-12px_rgba(31,22,25,0.18)] flex items-start gap-3.5 animate-editorial-in"
+        >
+          <div
+            className={cn(
+              "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border",
+              editorialToast.tone === "warning"
+                ? "border-[#F5C2C7] bg-[#FFF5F6] text-[#9E2A3A]"
+                : "border-[#EAD4DF] bg-[#FDF8FA] text-[#9E4765]"
+            )}
+          >
+            {editorialToast.tone === "progress" && (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            )}
+            {editorialToast.tone === "warning" && (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            {editorialToast.tone === "default" && (
+              <Sparkles className="h-4 w-4" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0 pr-2">
+            <p className="font-serif text-sm font-medium text-[#1F1619]">
+              {editorialToast.title}
+            </p>
+            <p className="text-xs text-[#6E5A61] mt-0.5 leading-relaxed">
+              {editorialToast.subtitle}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setEditorialToast(null)}
+            className="text-[#A39197] hover:text-[#1F1619] transition-colors cursor-pointer"
+            aria-label="Dismiss notification"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

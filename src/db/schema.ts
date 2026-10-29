@@ -22,12 +22,6 @@ export const orderStatusEnum = pgEnum("order_status", [
   "cancelled",
 ]);
 
-export const messageChannelEnum = pgEnum("message_channel", [
-  "email",
-  "whatsapp",
-  "telegram",
-]);
-
 export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
   reference: text("reference").notNull().unique(),
@@ -44,6 +38,7 @@ export const orders = pgTable("orders", {
   email: text("email"),
   phoneE164: text("phone_e164"),
   driveFolderId: text("drive_folder_id"),
+  driveFolderUrl: text("drive_folder_url"),
   consentAt: timestamp("consent_at", { withTimezone: true }),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -79,26 +74,6 @@ export const photos = pgTable("photos", {
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const notes = pgTable("notes", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  orderId: uuid("order_id")
-    .notNull()
-    .references(() => orders.id, { onDelete: "cascade" }),
-  adminEmail: text("admin_email").notNull(),
-  body: text("body").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export const messageLog = pgTable("message_log", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
-  channel: messageChannelEnum("channel").notNull(),
-  template: text("template").notNull(),
-  status: text("status").notNull(), // 'sent' | 'failed' | 'link_generated' | 'logged'
-  error: text("error"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
 export const devOutbox = pgTable("dev_outbox", {
   id: uuid("id").defaultRandom().primaryKey(),
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
@@ -125,8 +100,6 @@ export const statusHistory = pgTable("status_history", {
 export const ordersRelations = relations(orders, ({ many }) => ({
   answers: many(answers),
   photos: many(photos),
-  notes: many(notes),
-  messageLogs: many(messageLog),
   statusHistory: many(statusHistory),
   devEmails: many(devOutbox),
 }));
@@ -145,20 +118,6 @@ export const photosRelations = relations(photos, ({ one }) => ({
   }),
 }));
 
-export const notesRelations = relations(notes, ({ one }) => ({
-  order: one(orders, {
-    fields: [notes.orderId],
-    references: [orders.id],
-  }),
-}));
-
-export const messageLogRelations = relations(messageLog, ({ one }) => ({
-  order: one(orders, {
-    fields: [messageLog.orderId],
-    references: [orders.id],
-  }),
-}));
-
 export const statusHistoryRelations = relations(statusHistory, ({ one }) => ({
   order: one(orders, {
     fields: [statusHistory.orderId],
@@ -170,8 +129,6 @@ export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type Answer = typeof answers.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
-export type Note = typeof notes.$inferSelect;
-export type MessageLogEntry = typeof messageLog.$inferSelect;
 export type DevOutboxEntry = typeof devOutbox.$inferSelect;
 export type StatusHistoryEntry = typeof statusHistory.$inferSelect;
 export type OrderStatus = (typeof orderStatusEnum.enumValues)[number];

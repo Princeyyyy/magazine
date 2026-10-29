@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, ensureDbReady } from "@/db";
-import { orders, notes, statusHistory, orderStatusEnum, type OrderStatus } from "@/db/schema";
+import { orders, statusHistory, orderStatusEnum, type OrderStatus } from "@/db/schema";
 import { getAuthenticatedAdminEmail } from "@/auth";
 import { getMailer } from "@/lib/services/mailer";
-import { getWhatsAppProvider } from "@/lib/services/whatsapp";
 import { renderCustomerConfirmationEmail } from "@/emails/templates";
-import { sanitizeText } from "@/lib/security";
 import { handleApiError } from "@/lib/api-response";
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 
@@ -22,9 +20,8 @@ export async function PATCH(
 
     const { orderId } = await context.params;
     const body = (await req.json()) as {
-      action?: "update_status" | "add_note" | "send_whatsapp" | "send_email";
+      action?: "update_status" | "send_email";
       status?: OrderStatus;
-      noteBody?: string;
       emailSubject?: string;
       emailMessage?: string;
     };
@@ -61,53 +58,16 @@ export async function PATCH(
       return NextResponse.json({ ok: true, status: body.status });
     }
 
-    if (body.action === "add_note") {
-      const cleanNote = sanitizeText(body.noteBody ?? "");
-      if (!cleanNote) {
-        throw new ValidationError("Note cannot be empty.");
-      }
-
-      const [createdNote] = await db
-        .insert(notes)
-        .values({
-          orderId: order.id,
-          adminEmail,
-          body: cleanNote,
-        })
-        .returning();
-
-      return NextResponse.json({ ok: true, note: createdNote });
-    }
-
-    if (body.action === "send_whatsapp") {
-      if (!order.phoneE164) {
-        throw new ValidationError("Customer phone number is not set on this order.");
-      }
-      const wa = getWhatsAppProvider();
-      const result = await wa.sendOrderUpdate({
-        orderId: order.id,
-        orderReference: order.reference,
-        herName: order.herName || "Her",
-        customerName: order.customerName || "Customer",
-        toPhoneE164: order.phoneE164,
-        statusLabel: order.status.replace(/_/g, " "),
-      });
-
-      return NextResponse.json({ ok: result.ok, result });
-    }
-
     if (body.action === "send_email") {
       if (!order.email) {
         throw new ValidationError("Customer email is not set on this order.");
       }
       const mailer = getMailer();
-      const wa = getWhatsAppProvider();
-      const waUrl = wa.buildCustomerWaLink(order.reference, order.herName ?? undefined);
 
       if (body.emailMessage && body.emailMessage.trim()) {
         const subject =
           body.emailSubject?.trim() ||
-          `Update on ${order.herName || "her"}'s custom magazine (${order.reference})`;
+          `Update on ${order.herName || "your"} custom magazine (${order.reference})`;
         const text = body.emailMessage.trim();
         const html = `<div style="font-family:Georgia,serif;color:#1F1619;max-width:580px;margin:20px auto;padding:32px;border:1px solid #EFE6E0;background:#FFFFFF;">
           <p style="text-transform:uppercase;letter-spacing:2px;font-size:11px;color:#9E4765;font-family:sans-serif;">CUSTOM MAGAZINE</p>
@@ -130,11 +90,10 @@ export async function PATCH(
         // Resend order confirmation email
         const tpl = renderCustomerConfirmationEmail({
           customerName: order.customerName || "Customer",
-          herName: order.herName || "Her",
+          herName: order.herName || "Featured Star",
           orderReference: order.reference,
           colourTheme: order.colourTheme || "Editorial",
           photoCount: 15,
-          whatsAppUrl: waUrl,
         });
 
         const sendRes = await mailer.sendMail({
