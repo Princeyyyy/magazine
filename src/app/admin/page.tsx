@@ -110,6 +110,16 @@ export default async function AdminOrdersPage({
   }
 
   const filtered = allOrders.filter((o) => {
+    // Exclude blank phantom drafts with no customer details or photos
+    const photoCount = photoCountMap.get(o.id) || 0;
+    const isPhantomDraft =
+      o.status === "draft" &&
+      !o.customerName?.trim() &&
+      !o.herName?.trim() &&
+      !o.email?.trim() &&
+      photoCount === 0;
+    if (isPhantomDraft) return false;
+
     if (statusFilter && o.status !== statusFilter) return false;
     if (
       themeFilter &&

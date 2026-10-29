@@ -7,7 +7,7 @@ import { orders, photos } from "@/db/schema";
 import { getAuthenticatedAdminEmail } from "@/auth";
 import { getPhotoStorage, getLocalDiskStorage } from "@/lib/services/photo-storage";
 import { handleApiError } from "@/lib/api-response";
-import { NotFoundError, UnauthorizedError } from "@/lib/errors";
+import { NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 
 export async function GET(
   _req: NextRequest,
@@ -35,6 +35,10 @@ export async function GET(
       .from(photos)
       .where(eq(photos.orderId, order.id))
       .orderBy(asc(photos.sortOrder), asc(photos.uploadedAt));
+
+    if (orderPhotos.length === 0) {
+      throw new ValidationError("This order has no uploaded photos to export.");
+    }
 
     const archive = archiver("zip", { zlib: { level: 5 } });
     const passThrough = new PassThrough();

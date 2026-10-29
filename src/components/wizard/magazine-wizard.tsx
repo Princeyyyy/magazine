@@ -208,6 +208,8 @@ export function MagazineWizard() {
 
   const valuesRef = useRef(values);
   valuesRef.current = values;
+  const draftTokenRef = useRef(draftToken);
+  draftTokenRef.current = draftToken;
   const userEditedBeforeInitRef = useRef(false);
   const welcomedRef = useRef(false);
 
@@ -231,6 +233,20 @@ export function MagazineWizard() {
             : null) ||
           undefined;
 
+        // If there is no stored token, welcome the user immediately without creating any DB row
+        if (!storedToken) {
+          if (!welcomedRef.current) {
+            welcomedRef.current = true;
+            showEditorialToast(
+              "Welcome to Custom Magazine",
+              "Craft a bespoke editorial keepsake. Your answers and photos save automatically as you go.",
+              "default",
+              5000
+            );
+          }
+          return;
+        }
+
         const res = await fetch("/api/orders/draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -248,12 +264,30 @@ export function MagazineWizard() {
           };
         };
 
-        if (!active || !data.draft) return;
+        if (!active) return;
 
         if (typeof data.isDevMode === "boolean") {
           setIsDevMode(data.isDevMode);
         }
 
+        // If token was invalid or pruned from database, reset storage and show clean welcome
+        if (!data.draft) {
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+          }
+          if (!welcomedRef.current) {
+            welcomedRef.current = true;
+            showEditorialToast(
+              "Welcome to Custom Magazine",
+              "Craft a bespoke editorial keepsake. Your answers and photos save automatically as you go.",
+              "default",
+              5000
+            );
+          }
+          return;
+        }
+
+        draftTokenRef.current = data.draft.draftToken;
         setDraftToken(data.draft.draftToken);
         setOrderReference(data.draft.reference);
         setOrderStatus(data.draft.status);
@@ -306,14 +340,6 @@ export function MagazineWizard() {
 
               showEditorialToast(title, subtitle, "default", 5500);
             }
-          } else if (!storedToken && !welcomedRef.current) {
-            welcomedRef.current = true;
-            showEditorialToast(
-              "Welcome to Custom Magazine",
-              "Craft a bespoke editorial keepsake. Your answers and photos save automatically as you go.",
-              "default",
-              5000
-            );
           }
         }
 
@@ -340,28 +366,56 @@ export function MagazineWizard() {
     };
   }, [resumeTokenParam, showEditorialToast]);
 
-  // Save draft helper
+  // Save draft helper: lazily creates draft on first meaningful edit, then updates
   const persistDraftNow = useCallback(
     async (overrideValues?: Record<string, unknown>) => {
-      if (!draftToken || orderStatus !== "draft") return;
+      if (orderStatus !== "draft") return;
+      const payloadValues = overrideValues ?? valuesRef.current;
+
+      // Do not ping server or create phantom records if still blank and has no token
+      if (!draftTokenRef.current && !hasAnySavedProgress(payloadValues, photos)) {
+        return;
+      }
+
       setSaveState("saving");
       try {
-        const payloadValues = overrideValues ?? valuesRef.current;
-        await fetch("/api/orders/draft", {
+        const res = await fetch("/api/orders/draft", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            token: draftToken,
+            token: draftTokenRef.current || undefined,
             values: payloadValues,
             honeypot,
           }),
         });
-        setSaveState("saved");
+
+        const data = (await res.json()) as {
+          ok?: boolean;
+          draftToken?: string;
+          reference?: string;
+          status?: string;
+        };
+
+        if (data.ok && data.draftToken) {
+          if (!draftTokenRef.current || draftTokenRef.current !== data.draftToken) {
+            draftTokenRef.current = data.draftToken;
+            setDraftToken(data.draftToken);
+            if (data.reference) {
+              setOrderReference(data.reference);
+            }
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem(DRAFT_STORAGE_KEY, data.draftToken);
+            }
+          }
+          setSaveState("saved");
+        } else {
+          setSaveState("idle");
+        }
       } catch {
         setSaveState("idle");
       }
     },
-    [draftToken, honeypot, orderStatus]
+    [honeypot, orderStatus, photos]
   );
 
   const triggerDebouncedSave = useCallback(() => {
@@ -609,13 +663,15 @@ export function MagazineWizard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: draftToken,
+          token: draftTokenRef.current || undefined,
           email: resumeEmailInput.trim(),
           values: valuesRef.current,
         }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
+        draftToken?: string;
+        reference?: string;
         message?: string;
         error?: { message?: string };
       };
@@ -625,6 +681,18 @@ export function MagazineWizard() {
         );
         return;
       }
+
+      if (data.draftToken) {
+        draftTokenRef.current = data.draftToken;
+        setDraftToken(data.draftToken);
+        if (data.reference) {
+          setOrderReference(data.reference);
+        }
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(DRAFT_STORAGE_KEY, data.draftToken);
+        }
+      }
+
       setFieldValue("email", resumeEmailInput.trim());
       setIsBookmarked(true);
       setResumeEmailStatus(
@@ -651,11 +719,38 @@ export function MagazineWizard() {
     );
 
     try {
+      let activeToken = draftTokenRef.current;
+      if (!activeToken) {
+        const saveRes = await fetch("/api/orders/draft", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            values: { ...valuesRef.current, photos },
+            honeypot,
+          }),
+        });
+        const saveData = (await saveRes.json()) as {
+          ok?: boolean;
+          draftToken?: string;
+          reference?: string;
+        };
+        if (saveData.ok && saveData.draftToken) {
+          activeToken = saveData.draftToken;
+          draftTokenRef.current = activeToken;
+          setDraftToken(activeToken);
+          if (saveData.reference) setOrderReference(saveData.reference);
+        }
+      }
+
+      if (!activeToken) {
+        throw new Error("Could not initialize your order before submission.");
+      }
+
       const res = await fetch("/api/orders/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: draftToken,
+          token: activeToken,
           values: { ...valuesRef.current, photos },
           honeypot,
         }),
@@ -1024,6 +1119,16 @@ export function MagazineWizard() {
             onChange={handlePhotosChange}
             errorMessage={fieldError}
             gender={selectedGender}
+            onDraftCreated={(token, reference) => {
+              draftTokenRef.current = token;
+              setDraftToken(token);
+              if (reference) {
+                setOrderReference(reference);
+              }
+              if (typeof window !== "undefined") {
+                window.localStorage.setItem(DRAFT_STORAGE_KEY, token);
+              }
+            }}
           />
         );
       }

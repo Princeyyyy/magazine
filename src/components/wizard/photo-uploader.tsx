@@ -41,6 +41,7 @@ interface PhotoUploaderProps {
   onChange: (nextPhotos: UploadedPhotoItem[]) => void;
   errorMessage?: string;
   gender?: string;
+  onDraftCreated?: (token: string, reference: string) => void;
 }
 
 const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB chunks for resumable upload
@@ -73,6 +74,7 @@ export function PhotoUploader({
   onChange,
   errorMessage,
   gender = "Female",
+  onDraftCreated,
 }: PhotoUploaderProps) {
   const [queue, setQueue] = useState<UploadingFileState[]>([]);
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -80,6 +82,10 @@ export function PhotoUploader({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const photosRef = useRef<UploadedPhotoItem[]>(photos);
   photosRef.current = photos;
+  const draftTokenRef = useRef(draftToken);
+  draftTokenRef.current = draftToken;
+  const onDraftCreatedRef = useRef(onDraftCreated);
+  onDraftCreatedRef.current = onDraftCreated;
 
   const updatePhotos = useCallback(
     (updater: (prev: UploadedPhotoItem[]) => UploadedPhotoItem[]) => {
@@ -112,7 +118,7 @@ export function PhotoUploader({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              draftToken,
+              draftToken: draftTokenRef.current || undefined,
               fileName: item.file.name,
               mimeType: item.file.type || "image/jpeg",
               sizeBytes: item.file.size,
@@ -124,6 +130,8 @@ export function PhotoUploader({
               sessionId: string;
               uploadUrl: string;
               storageProvider: "local" | "drive";
+              draftToken?: string;
+              reference?: string;
             };
             error?: { message?: string };
           };
@@ -131,6 +139,17 @@ export function PhotoUploader({
           if (!sessionRes.ok || !sessionData.session) {
             throw new Error(
               sessionData.error?.message || "Could not start upload session."
+            );
+          }
+
+          if (
+            sessionData.session.draftToken &&
+            sessionData.session.draftToken !== draftTokenRef.current
+          ) {
+            draftTokenRef.current = sessionData.session.draftToken;
+            onDraftCreatedRef.current?.(
+              sessionData.session.draftToken,
+              sessionData.session.reference ?? ""
             );
           }
 
@@ -212,7 +231,7 @@ export function PhotoUploader({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            draftToken,
+            draftToken: draftTokenRef.current,
             sessionId,
             storageFileId: driveFileId,
             caption: "",
@@ -249,7 +268,7 @@ export function PhotoUploader({
         );
       }
     },
-    [draftToken, updatePhotos]
+    [updatePhotos]
   );
 
   const handleFilesSelected = useCallback(
@@ -320,11 +339,13 @@ export function PhotoUploader({
       }))
     );
 
-    await fetch(`/api/uploads/${photoId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draftToken, isCover: true }),
-    }).catch(() => {});
+    if (draftTokenRef.current) {
+      await fetch(`/api/uploads/${photoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftToken: draftTokenRef.current, isCover: true }),
+      }).catch(() => {});
+    }
   };
 
   const handleCaptionChange = (photoId: string, caption: string) => {
@@ -335,11 +356,13 @@ export function PhotoUploader({
   };
 
   const handleCaptionBlur = async (photoId: string, caption: string) => {
-    await fetch(`/api/uploads/${photoId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draftToken, caption }),
-    }).catch(() => {});
+    if (draftTokenRef.current) {
+      await fetch(`/api/uploads/${photoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftToken: draftTokenRef.current, caption }),
+      }).catch(() => {});
+    }
   };
 
   const handleRemovePhoto = async (photoId: string) => {
@@ -350,10 +373,12 @@ export function PhotoUploader({
     }
     updatePhotos(() => remaining);
 
-    await fetch(
-      `/api/uploads/${photoId}?draftToken=${encodeURIComponent(draftToken)}`,
-      { method: "DELETE" }
-    ).catch(() => {});
+    if (draftTokenRef.current) {
+      await fetch(
+        `/api/uploads/${photoId}?draftToken=${encodeURIComponent(draftTokenRef.current)}`,
+        { method: "DELETE" }
+      ).catch(() => {});
+    }
   };
 
   const count = photos.length;

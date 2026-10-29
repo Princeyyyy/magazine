@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createOrLoadDraft,
-  getDraftByToken,
-  saveDraftAnswers,
-} from "@/lib/orders";
+import { getDraftByToken, saveDraftAnswers } from "@/lib/orders";
 import { handleApiError, getClientIp } from "@/lib/api-response";
 import { checkRateLimit } from "@/lib/security";
 import { RateLimitError, ValidationError } from "@/lib/errors";
@@ -13,12 +9,9 @@ export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get("token")?.trim();
     if (!token) {
-      throw new ValidationError("Missing draft token.");
+      return NextResponse.json({ draft: null });
     }
     const draft = await getDraftByToken(token);
-    if (!draft) {
-      return NextResponse.json({ draft: null }, { status: 404 });
-    }
     return NextResponse.json({ draft });
   } catch (error) {
     return handleApiError(error);
@@ -28,7 +21,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
-    const rate = checkRateLimit(`draft:create:${ip}`, 30, 60_000);
+    const rate = checkRateLimit(`draft:load:${ip}`, 60, 60_000);
     if (!rate.allowed) {
       throw new RateLimitError(rate.retryAfterMs);
     }
@@ -38,12 +31,14 @@ export async function POST(req: NextRequest) {
       honeypot?: string;
     };
 
-    // Honeypot check: silently reject bots
     if (body.honeypot && body.honeypot.trim().length > 0) {
       throw new ValidationError("Invalid request.");
     }
 
-    const draft = await createOrLoadDraft(body.token);
+    // Only load if an existing token was supplied; never create an empty phantom draft on page load
+    const draft = body.token?.trim()
+      ? await getDraftByToken(body.token.trim())
+      : null;
     const { isDevMode } = getServiceModeSummary();
     return NextResponse.json({ draft, isDevMode });
   } catch (error) {
@@ -63,12 +58,13 @@ export async function PUT(req: NextRequest) {
       throw new ValidationError("Invalid request.");
     }
 
-    if (!body.token || !body.values) {
-      throw new ValidationError("Draft token and values are required.");
+    if (!body.values) {
+      throw new ValidationError("Values are required.");
     }
 
+    // saveDraftAnswers will lazily create the draft order on the first save containing real data
     const result = await saveDraftAnswers(body.token, body.values);
-    return NextResponse.json(result);
+    return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     return handleApiError(error);
   }

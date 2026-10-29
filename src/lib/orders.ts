@@ -17,26 +17,63 @@ import { env } from "@/env";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 
 /**
- * Generates an order reference like HM-2026-0001
+ * Checks whether values object contains any user-entered content (ignoring defaults).
+ * Used to avoid creating phantom orders in database when the form is still blank.
+ */
+export function hasMeaningfulValues(values: Record<string, unknown>): boolean {
+  for (const [key, val] of Object.entries(values)) {
+    if (
+      key === "subject_gender" ||
+      key === "photos" ||
+      key === "honeypot" ||
+      key === "token"
+    ) {
+      continue;
+    }
+    if (typeof val === "string" && val.trim().length > 0) return true;
+    if (typeof val === "number" && !Number.isNaN(val)) return true;
+    if (val === true) return true;
+    if (Array.isArray(val) && val.length > 0) {
+      const anyRow = val.some(
+        (row) =>
+          row &&
+          typeof row === "object" &&
+          Object.values(row as Record<string, unknown>).some(
+            (c) => typeof c === "string" && c.trim().length > 0
+          )
+      );
+      if (anyRow) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Generates an order reference like HM-2026-0001 deterministically
+ * by finding the highest sequential number in the current year.
  */
 export async function generateNextOrderReference(): Promise<string> {
   await ensureDbReady();
   const year = new Date().getFullYear();
-  const countRes = await db
-    .select({ count: sql<number>`count(*)::int` })
+  const prefix = `HM-${year}-`;
+
+  const existingOrders = await db
+    .select({ reference: orders.reference })
     .from(orders);
-  const nextNum = (countRes[0]?.count ?? 0) + 1;
-  const padded = String(nextNum).padStart(4, "0");
-  // Add a check to avoid collisions if orders were deleted
-  const candidate = `HM-${year}-${padded}`;
-  const existing = await db.query.orders.findFirst({
-    where: eq(orders.reference, candidate),
-  });
-  if (existing) {
-    const randSuffix = crypto.randomInt(1000, 9999);
-    return `HM-${year}-${randSuffix}`;
+
+  let maxNum = 0;
+  for (const o of existingOrders) {
+    if (o.reference?.startsWith(prefix)) {
+      const numPart = Number.parseInt(o.reference.slice(prefix.length), 10);
+      if (!Number.isNaN(numPart) && numPart > maxNum) {
+        maxNum = numPart;
+      }
+    }
   }
-  return candidate;
+
+  const nextNum = maxNum + 1;
+  const padded = String(nextNum).padStart(4, "0");
+  return `${prefix}${padded}`;
 }
 
 export function buildPhotoPreviewUrl(photoId: string, orderId: string): string {
@@ -61,9 +98,11 @@ export interface HydratedDraftOrder {
 export async function getDraftByToken(
   draftToken: string
 ): Promise<HydratedDraftOrder | null> {
+  if (!draftToken || !draftToken.trim()) return null;
   await ensureDbReady();
+
   const order = await db.query.orders.findFirst({
-    where: eq(orders.draftToken, draftToken),
+    where: eq(orders.draftToken, draftToken.trim()),
   });
 
   if (!order) return null;
@@ -127,11 +166,14 @@ export async function getDraftByToken(
 }
 
 /**
- * Creates a new draft order or returns an existing one if draftToken is provided.
+ * Creates a new draft order in database or loads an existing one.
+ * NOTE: If existingToken is not found and initialValues is empty, returns null
+ * to prevent generating empty phantom orders on simple page visits.
  */
 export async function createOrLoadDraft(
-  existingToken?: string
-): Promise<HydratedDraftOrder> {
+  existingToken?: string,
+  initialValues?: Record<string, unknown>
+): Promise<HydratedDraftOrder | null> {
   await ensureDbReady();
 
   if (existingToken) {
@@ -139,51 +181,84 @@ export async function createOrLoadDraft(
     if (found) return found;
   }
 
-  const reference = await generateNextOrderReference();
-  const draftToken = crypto.randomBytes(24).toString("hex");
-
-  const [created] = await db
-    .insert(orders)
-    .values({
-      reference,
-      draftToken,
-      status: "draft",
-    })
-    .returning();
-
-  if (!created) {
-    throw new Error("Failed to create draft order.");
+  // Do not create a database row unless user entered meaningful values
+  if (!initialValues || !hasMeaningfulValues(initialValues)) {
+    return null;
   }
 
-  const hydrated = await getDraftByToken(created.draftToken);
-  if (!hydrated) {
-    throw new Error("Failed to hydrate newly created draft.");
-  }
-  return hydrated;
+  const saved = await saveDraftAnswers(undefined, initialValues);
+  if (!saved.draftToken) return null;
+  return getDraftByToken(saved.draftToken);
 }
 
 /**
  * Saves partial answers on page change or debounced field blur.
+ * Lazily creates the draft order in database when data is first supplied.
  */
 export async function saveDraftAnswers(
-  draftToken: string,
+  draftToken: string | undefined,
   partialValues: Record<string, unknown>
-): Promise<{ updatedAt: string; status: string }> {
+): Promise<{
+  orderId: string;
+  reference: string;
+  draftToken: string;
+  updatedAt: string;
+  status: string;
+  created: boolean;
+}> {
   await ensureDbReady();
 
-  const order = await db.query.orders.findFirst({
-    where: eq(orders.draftToken, draftToken),
-  });
+  const cleanToken = draftToken?.trim();
+  let order = cleanToken
+    ? await db.query.orders.findFirst({
+        where: eq(orders.draftToken, cleanToken),
+      })
+    : null;
+
+  let createdNew = false;
 
   if (!order) {
-    throw new NotFoundError("Order draft");
+    // If no order exists yet, only create if values have real content
+    if (!hasMeaningfulValues(partialValues)) {
+      return {
+        orderId: "",
+        reference: "",
+        draftToken: "",
+        updatedAt: new Date().toISOString(),
+        status: "draft",
+        created: false,
+      };
+    }
+
+    const reference = await generateNextOrderReference();
+    const newDraftToken = crypto.randomBytes(24).toString("hex");
+
+    const [createdOrder] = await db
+      .insert(orders)
+      .values({
+        reference,
+        draftToken: newDraftToken,
+        status: "draft",
+      })
+      .returning();
+
+    if (!createdOrder) {
+      throw new Error("Failed to create draft order.");
+    }
+
+    order = createdOrder;
+    createdNew = true;
   }
 
   // If already submitted, do not overwrite locked order
   if (order.status !== "draft") {
     return {
+      orderId: order.id,
+      reference: order.reference,
+      draftToken: order.draftToken,
       updatedAt: order.updatedAt.toISOString(),
       status: order.status,
+      created: false,
     };
   }
 
@@ -258,15 +333,19 @@ export async function saveDraftAnswers(
   }
 
   return {
+    orderId: order.id,
+    reference: order.reference,
+    draftToken: order.draftToken,
     updatedAt: topLevelUpdates.updatedAt!.toISOString(),
     status: order.status,
+    created: createdNew,
   };
 }
 
 /**
  * Final idempotent submission of an order.
  * Validates all 9 pages server-side using the generated Zod schema,
- * locks the order, creates the Drive/Local folder if missing, and triggers confirmation emails & notifications.
+ * locks the order, creates the Drive/Local folder if photos exist, and triggers notifications.
  */
 export async function submitOrder(
   draftToken: string,
@@ -278,15 +357,19 @@ export async function submitOrder(
 }> {
   await ensureDbReady();
 
+  if (!draftToken || !draftToken.trim()) {
+    throw new ValidationError("Missing draft token.");
+  }
+
   const existingOrder = await db.query.orders.findFirst({
-    where: eq(orders.draftToken, draftToken),
+    where: eq(orders.draftToken, draftToken.trim()),
   });
 
   if (!existingOrder) {
     throw new NotFoundError("Order draft");
   }
 
-  // Idempotency: if already submitted, return immediately without re-sending emails
+  // Idempotency: if already submitted, return immediately without duplicate notification
   if (existingOrder.status !== "draft") {
     return {
       alreadySubmitted: true,
@@ -328,37 +411,39 @@ export async function submitOrder(
       ? `Other (${String(validData["other_colour_theme"])})`
       : String(validData["colour_theme"] || "");
 
-  // Ensure Drive / Storage folder is created or renamed to "{Her full name} - {order reference}"
-  // and store the direct Google Drive folder URL on the order record
+  // Create Google Drive folder ONLY if order actually contains uploaded photos
   let driveFolderId = existingOrder.driveFolderId;
   let driveFolderUrl = existingOrder.driveFolderUrl;
   const storage = getPhotoStorage();
   const folderLabel = `${herName} - ${existingOrder.reference}`;
-  try {
-    if (!driveFolderId) {
-      driveFolderId = await storage.createOrderFolder(
+
+  if (hydrated.photos.length > 0 || driveFolderId) {
+    try {
+      if (!driveFolderId) {
+        driveFolderId = await storage.createOrderFolder(
+          existingOrder.id,
+          folderLabel
+        );
+      } else {
+        await storage.renameOrderFolder(driveFolderId, folderLabel);
+      }
+      driveFolderUrl = await storage.getFolderUrl(
         existingOrder.id,
-        folderLabel
+        driveFolderId
       );
-    } else {
-      await storage.renameOrderFolder(driveFolderId, folderLabel);
+    } catch (err) {
+      console.error("Failed to sync order folder on submit:", err);
+      void getAdminNotifier().notifyCriticalIssue({
+        context: "Google Drive Folder Sync Failure on Order Submit",
+        summary:
+          err instanceof Error
+            ? err.message
+            : "Could not create or rename Google Drive folder on submission.",
+        orderReference: existingOrder.reference,
+        orderId: existingOrder.id,
+        details: err instanceof Error ? err.stack : String(err),
+      });
     }
-    driveFolderUrl = await storage.getFolderUrl(
-      existingOrder.id,
-      driveFolderId
-    );
-  } catch (err) {
-    console.error("Failed to sync order folder on submit:", err);
-    void getAdminNotifier().notifyCriticalIssue({
-      context: "Google Drive Folder Sync Failure on Order Submit",
-      summary:
-        err instanceof Error
-          ? err.message
-          : "Could not create or rename Google Drive folder on submission.",
-      orderReference: existingOrder.reference,
-      orderId: existingOrder.id,
-      details: err instanceof Error ? err.stack : String(err),
-    });
   }
 
   const now = new Date();

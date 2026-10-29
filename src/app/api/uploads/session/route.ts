@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { eq, sql } from "drizzle-orm";
 import { db, ensureDbReady } from "@/db";
 import { orders, photos } from "@/db/schema";
@@ -6,6 +7,7 @@ import { getPhotoStorage } from "@/lib/services/photo-storage";
 import { PHOTO_UPLOAD_CONFIG } from "@/config/form";
 import { handleApiError, getClientIp } from "@/lib/api-response";
 import { checkRateLimit, sanitizeFileName } from "@/lib/security";
+import { generateNextOrderReference } from "@/lib/orders";
 import { NotFoundError, RateLimitError, ValidationError } from "@/lib/errors";
 
 const folderCreationLocks = new Map<string, Promise<string>>();
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
       sizeBytes?: number;
     };
 
-    if (!body.draftToken || !body.fileName || typeof body.sizeBytes !== "number") {
+    if (!body.fileName || typeof body.sizeBytes !== "number") {
       throw new ValidationError("Missing upload parameters.");
     }
 
@@ -91,12 +93,28 @@ export async function POST(req: NextRequest) {
     }
 
     await ensureDbReady();
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.draftToken, body.draftToken),
-    });
+    let order = body.draftToken?.trim()
+      ? await db.query.orders.findFirst({
+          where: eq(orders.draftToken, body.draftToken.trim()),
+        })
+      : null;
 
     if (!order) {
-      throw new NotFoundError("Order draft");
+      const reference = await generateNextOrderReference();
+      const newDraftToken = crypto.randomBytes(24).toString("hex");
+      const [createdOrder] = await db
+        .insert(orders)
+        .values({
+          reference,
+          draftToken: newDraftToken,
+          status: "draft",
+        })
+        .returning();
+
+      if (!createdOrder) {
+        throw new Error("Failed to initialize draft for photo upload.");
+      }
+      order = createdOrder;
     }
 
     if (order.status !== "draft") {
@@ -134,7 +152,13 @@ export async function POST(req: NextRequest) {
       driveFolderId
     );
 
-    return NextResponse.json({ session });
+    return NextResponse.json({
+      session: {
+        ...session,
+        draftToken: order.draftToken,
+        reference: order.reference,
+      },
+    });
   } catch (error) {
     return handleApiError(error);
   }

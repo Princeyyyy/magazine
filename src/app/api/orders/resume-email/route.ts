@@ -30,25 +30,25 @@ export async function POST(req: NextRequest) {
       values?: Record<string, unknown>;
     };
 
-    if (!body.token) {
-      throw new ValidationError("Draft token is required.");
-    }
-
     const parsedEmail = emailSchema.safeParse(body.email);
     if (!parsedEmail.success) {
       throw new ValidationError("Please enter a valid email address.");
     }
 
-    if (body.values) {
-      await saveDraftAnswers(body.token, {
-        ...body.values,
-        email: parsedEmail.data,
-      });
-    } else {
-      await saveDraftAnswers(body.token, { email: parsedEmail.data });
+    // Save or lazily create the draft order containing their email and partial answers
+    const valuesToSave = {
+      ...(body.values ?? {}),
+      email: parsedEmail.data,
+    };
+
+    const saveResult = await saveDraftAnswers(body.token, valuesToSave);
+    const activeToken = saveResult.draftToken || body.token;
+
+    if (!activeToken) {
+      throw new ValidationError("Could not initialize your magazine draft.");
     }
 
-    const draft = await getDraftByToken(body.token);
+    const draft = await getDraftByToken(activeToken);
     if (!draft) {
       throw new NotFoundError("Order draft");
     }
@@ -89,6 +89,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      draftToken: draft.draftToken,
+      reference: draft.reference,
       resumeUrl,
       message: "I have sent your private resume link to your email.",
     });
