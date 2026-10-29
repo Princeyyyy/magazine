@@ -367,6 +367,16 @@ export async function submitOrder(
     );
   } catch (err) {
     console.error("Failed to sync order folder on submit:", err);
+    void getAdminNotifier().notifyCriticalIssue({
+      context: "Google Drive Folder Sync Failure on Order Submit",
+      summary:
+        err instanceof Error
+          ? err.message
+          : "Could not create or rename Google Drive folder on submission.",
+      orderReference: existingOrder.reference,
+      orderId: existingOrder.id,
+      details: err instanceof Error ? err.stack : String(err),
+    });
   }
 
   const now = new Date();
@@ -422,7 +432,7 @@ export async function submitOrder(
     template: "customer_order_confirmation",
   });
 
-  // Notify admin via AdminNotifier (email + optional Telegram)
+  // Notify admin via AdminNotifier (email to princemumo80@gmail.com + CC other ADMIN_EMAILS)
   const notifier = getAdminNotifier();
   await notifier.notifyNewOrder({
     orderId: existingOrder.id,
@@ -434,6 +444,7 @@ export async function submitOrder(
     colourTheme,
     photoCount: hydrated.photos.length,
     adminOrderUrl: `${env.NEXT_PUBLIC_APP_URL}/admin/orders/${existingOrder.id}`,
+    driveFolderUrl,
   });
 
   return {

@@ -120,6 +120,7 @@ export interface AdminNewOrderEmailProps {
   colourTheme: string;
   photoCount: number;
   adminOrderUrl: string;
+  driveFolderUrl?: string | null;
 }
 
 export function renderAdminNewOrderEmail(props: AdminNewOrderEmailProps): {
@@ -129,31 +130,91 @@ export function renderAdminNewOrderEmail(props: AdminNewOrderEmailProps): {
 } {
   const subject = `[New Order] ${props.orderReference} — ${props.herName} (by ${props.customerName})`;
 
+  const driveButtonHtml = props.driveFolderUrl
+    ? `<a href="${props.driveFolderUrl}" style="background:#9E4765;color:#FFFFFF;text-decoration:none;padding:12px 22px;font-size:14px;font-weight:600;margin-left:10px;">
+        Open Google Drive Photos (${props.photoCount})
+      </a>`
+    : "";
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8" /><title>${subject}</title></head>
 <body style="margin:0;padding:24px;background:#FAF6F3;font-family:sans-serif;color:#1F1619;">
   <div style="max-width:600px;margin:0 auto;background:#FFFFFF;border:1px solid #EBE0D8;padding:32px;">
-    <h2 style="margin:0 0 16px 0;color:#9E4765;">New Magazine Order Submitted</h2>
-    <p style="margin:0 0 16px 0;font-size:15px;">
+    <p style="text-transform:uppercase;letter-spacing:2.5px;font-size:11px;color:#9E4765;margin:0 0 6px 0;">
+      CUSTOM MAGAZINE  •  EDITORIAL DESK
+    </p>
+    <h2 style="margin:0 0 18px 0;color:#1F1619;font-family:Georgia,serif;font-weight:normal;font-size:24px;">
+      New Magazine Order Completed
+    </h2>
+    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.7;">
       <strong>Reference:</strong> ${props.orderReference}<br/>
       <strong>Featured Star:</strong> ${props.herName}<br/>
       <strong>Ordered By:</strong> ${props.customerName}<br/>
       <strong>Customer Email:</strong> ${props.email}<br/>
       <strong>Customer Phone:</strong> ${props.phoneE164}<br/>
       <strong>Colour Theme:</strong> ${props.colourTheme}<br/>
-      <strong>Photos Uploaded:</strong> ${props.photoCount}
+      <strong>Photos Uploaded:</strong> ${props.photoCount}${props.driveFolderUrl ? `<br/><strong>Google Drive Folder:</strong> <a href="${props.driveFolderUrl}" style="color:#9E4765;">${props.driveFolderUrl}</a>` : ""}
     </p>
     <p style="margin:24px 0 0 0;">
       <a href="${props.adminOrderUrl}" style="background:#1F1619;color:#FFFFFF;text-decoration:none;padding:12px 22px;font-size:14px;font-weight:600;">
         Open Order Brief in Admin
       </a>
+      ${driveButtonHtml}
     </p>
   </div>
 </body>
 </html>`;
 
-  const text = `New Magazine Order Submitted\nReference: ${props.orderReference}\nHer Name: ${props.herName}\nOrdered By: ${props.customerName}\nEmail: ${props.email}\nPhone: ${props.phoneE164}\nPhotos: ${props.photoCount}\nAdmin Link: ${props.adminOrderUrl}`;
+  const text = `New Magazine Order Completed\nReference: ${props.orderReference}\nFeatured Star: ${props.herName}\nOrdered By: ${props.customerName}\nEmail: ${props.email}\nPhone: ${props.phoneE164}\nColour Theme: ${props.colourTheme}\nPhotos: ${props.photoCount}${props.driveFolderUrl ? `\nGoogle Drive Folder: ${props.driveFolderUrl}` : ""}\nAdmin Link: ${props.adminOrderUrl}`;
+
+  return { subject, html, text };
+}
+
+export interface AdminCriticalAlertEmailProps {
+  context: string;
+  summary: string;
+  details?: string;
+  orderReference?: string;
+  orderId?: string;
+}
+
+export function renderAdminCriticalAlertEmail(
+  props: AdminCriticalAlertEmailProps
+): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const timestamp = new Date().toISOString();
+  const subject = `[Custom Magazine Alert] ${props.context}: ${props.summary.slice(0, 80)}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>${subject}</title></head>
+<body style="margin:0;padding:24px;background:#FAF6F3;font-family:sans-serif;color:#1F1619;">
+  <div style="max-width:600px;margin:0 auto;background:#FFFFFF;border:1px solid #F5C2C7;border-left:4px solid #B91C1C;padding:32px;">
+    <p style="text-transform:uppercase;letter-spacing:2.5px;font-size:11px;color:#B91C1C;margin:0 0 6px 0;font-weight:bold;">
+      CUSTOM MAGAZINE  •  SYSTEM ALERT
+    </p>
+    <h2 style="margin:0 0 14px 0;color:#1F1619;font-family:Georgia,serif;font-weight:normal;font-size:22px;">
+      ${props.context}
+    </h2>
+    <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#4A3A40;">
+      <strong>Summary:</strong> ${props.summary}<br/>
+      <strong>Timestamp (UTC):</strong> ${timestamp}
+      ${props.orderReference ? `<br/><strong>Order Reference:</strong> ${props.orderReference}` : ""}
+    </p>
+    ${
+      props.details
+        ? `<pre style="background:#FCF9F7;border:1px solid #EFE6E0;padding:14px;font-size:12px;overflow-x:auto;white-space:pre-wrap;color:#1F1619;">${props.details}</pre>`
+        : ""
+    }
+  </div>
+</body>
+</html>`;
+
+  const text = `CUSTOM MAGAZINE SYSTEM ALERT\nContext: ${props.context}\nSummary: ${props.summary}\nTimestamp: ${timestamp}${props.orderReference ? `\nOrder Reference: ${props.orderReference}` : ""}${props.details ? `\n\nDetails:\n${props.details}` : ""}`;
 
   return { subject, html, text };
 }

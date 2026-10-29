@@ -33,6 +33,19 @@ export function handleApiError(error: unknown): NextResponse {
   }
 
   console.error("Unexpected API error:", error);
+  void import("./services/admin-notifier")
+    .then(({ getAdminNotifier }) =>
+      getAdminNotifier().notifyCriticalIssue({
+        context: "Unhandled Server API Error",
+        summary:
+          error instanceof Error
+            ? error.message
+            : "Unexpected server exception",
+        details: error instanceof Error ? error.stack : String(error),
+      })
+    )
+    .catch(() => {});
+
   return NextResponse.json(
     {
       error: {

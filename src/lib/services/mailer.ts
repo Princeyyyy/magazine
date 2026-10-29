@@ -6,6 +6,7 @@ import { devOutbox } from "@/db/schema";
 export interface SendMailInput {
   orderId?: string;
   to: string;
+  cc?: string | string[];
   subject: string;
   html: string;
   text: string;
@@ -22,15 +23,23 @@ export class ConsoleMailer implements MailerAdapter {
   readonly providerName = "console" as const;
 
   async sendMail(input: SendMailInput): Promise<{ ok: boolean; error?: string }> {
+    const ccList = Array.isArray(input.cc)
+      ? input.cc.filter(Boolean)
+      : input.cc
+        ? [input.cc]
+        : [];
     console.info(
-      `[ConsoleMailer] To: ${input.to} | Subject: ${input.subject} | Template: ${input.template}`
+      `[ConsoleMailer] To: ${input.to}${ccList.length > 0 ? ` | CC: ${ccList.join(", ")}` : ""} | Subject: ${input.subject} | Template: ${input.template}`
     );
 
     try {
       await ensureDbReady();
       await db.insert(devOutbox).values({
         orderId: input.orderId ?? null,
-        toEmail: input.to,
+        toEmail:
+          ccList.length > 0
+            ? `${input.to} (CC: ${ccList.join(", ")})`
+            : input.to,
         subject: input.subject,
         htmlBody: input.html,
         textBody: input.text,
@@ -67,9 +76,15 @@ export class ResendMailer implements MailerAdapter {
     await ensureDbReady();
     try {
       const resend = this.getClient();
+      const ccList = Array.isArray(input.cc)
+        ? input.cc.filter(Boolean)
+        : input.cc
+          ? [input.cc]
+          : [];
       const res = await resend.emails.send({
         from: env.MAIL_FROM,
         to: input.to,
+        ...(ccList.length > 0 ? { cc: ccList } : {}),
         subject: input.subject,
         html: input.html,
         text: input.text,
@@ -91,6 +106,17 @@ export class ResendMailer implements MailerAdapter {
       const resend = this.getClient();
       const domains = await resend.domains.list();
       if (domains.error) {
+        // Sending-only Resend API keys return "This API key is restricted to only send emails" on domains.list()
+        if (
+          domains.error.message
+            .toLowerCase()
+            .includes("restricted to only send")
+        ) {
+          return {
+            ok: true,
+            message: `Resend sending-only API key active (sending from ${env.MAIL_FROM}).`,
+          };
+        }
         return { ok: false, message: domains.error.message };
       }
       return {

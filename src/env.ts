@@ -32,9 +32,8 @@ export const envSchema = z.object({
   DRIVE_ROOT_FOLDER_ID: optionalString,
 
   // Email (Resend)
-  // Without a custom domain, Resend allows sending from "Custom Magazine <onboarding@resend.dev>"
   RESEND_API_KEY: optionalString,
-  MAIL_FROM: optionalString.default("Custom Magazine <onboarding@resend.dev>"),
+  MAIL_FROM: optionalString.default("Custom Magazine <noreply@cleanplay.app>"),
 
   // WhatsApp
   WHATSAPP_NUMBER: optionalString.default("254700000000"),
@@ -79,6 +78,25 @@ export function getAdminAllowlist(currentEnv: EnvConfig = env): string[] {
   return currentEnv.ADMIN_EMAILS.split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+}
+
+/**
+ * Primary admin recipient for order completions and critical system alerts.
+ */
+export function getPrimaryAdminEmail(currentEnv: EnvConfig = env): string {
+  const explicit = currentEnv.ADMIN_NOTIFY_EMAIL?.trim().toLowerCase();
+  if (explicit) return explicit;
+  const allowlist = getAdminAllowlist(currentEnv);
+  return allowlist[0] || "princemumo80@gmail.com";
+}
+
+/**
+ * Additional admin emails from ADMIN_EMAILS to CC on order completion notifications
+ * (excludes the primary recipient so they are not listed in both To and CC).
+ */
+export function getCompletionCcEmails(currentEnv: EnvConfig = env): string[] {
+  const primary = getPrimaryAdminEmail(currentEnv);
+  return getAdminAllowlist(currentEnv).filter((email) => email !== primary);
 }
 
 export function getServiceModeSummary(currentEnv: EnvConfig = env) {
