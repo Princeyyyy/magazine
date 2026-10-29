@@ -1,3 +1,12 @@
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export interface OrderConfirmationEmailProps {
   customerName: string;
   herName: string;
@@ -6,60 +15,142 @@ export interface OrderConfirmationEmailProps {
   photoCount: number;
 }
 
-export function renderCustomerConfirmationEmail(props: OrderConfirmationEmailProps): {
+export function renderCustomerConfirmationEmail(
+  props: OrderConfirmationEmailProps
+): {
   subject: string;
   html: string;
   text: string;
 } {
-  const subject = `Your Custom Magazine order for ${props.herName} (${props.orderReference})`;
+  const customerName = escapeHtml(props.customerName || "Friend");
+  const herName = escapeHtml(props.herName || "your loved one");
+  const orderRef = escapeHtml(props.orderReference);
+  const colourTheme = escapeHtml(props.colourTheme || "Bespoke Editorial");
+  const subject = `Your Custom Magazine Order for ${props.herName} (${props.orderReference})`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>${subject}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#FAF6F3;font-family:Georgia,serif;color:#1F1619;">
-  <div style="max-width:600px;margin:40px auto;background:#FFFFFF;border:1px solid #EBE0D8;padding:48px 40px;">
-    <p style="text-transform:uppercase;letter-spacing:3px;font-size:11px;color:#9E4765;margin:0 0 8px 0;font-family:sans-serif;">
-      CUSTOM MAGAZINE
-    </p>
-    <h1 style="font-size:28px;font-weight:normal;margin:0 0 20px 0;color:#1F1619;">
-      Thank you, ${props.customerName}.
-    </h1>
-    <p style="font-size:16px;line-height:1.7;color:#4A3A40;margin:0 0 24px 0;">
-      I have received your answers, memories, and photos for <strong>${props.herName}</strong>'s custom magazine issue. I am already looking forward to bringing the pages to life.
-    </p>
-    <div style="background:#FAF6F3;border-left:3px solid #9E4765;padding:20px 24px;margin:0 0 28px 0;">
-      <p style="margin:0 0 8px 0;font-size:13px;color:#7A686E;font-family:sans-serif;">ORDER REFERENCE</p>
-      <p style="margin:0 0 16px 0;font-size:22px;font-weight:bold;letter-spacing:1px;color:#1F1619;">${props.orderReference}</p>
-      <p style="margin:0;font-size:14px;color:#4A3A40;">
-        <strong>Featured Star:</strong> ${props.herName}<br/>
-        <strong>Colour Direction:</strong> ${props.colourTheme}<br/>
-        <strong>Photos Uploaded:</strong> ${props.photoCount} photos
-      </p>
-    </div>
-    <p style="font-size:15px;line-height:1.6;color:#4A3A40;margin:0 0 28px 0;">
-      I will review everything carefully and be in touch with you soon regarding your magazine.
-    </p>
-    <hr style="border:none;border-top:1px solid #EBE0D8;margin:32px 0 20px 0;" />
-    <p style="font-size:12px;color:#8C7A80;margin:0;font-family:sans-serif;">
-      Custom Magazine &mdash; Bespoke Editorial Keepsakes
-    </p>
-  </div>
+<body style="margin:0;padding:0;background-color:#FAF6F3;font-family:Georgia,'Times New Roman',serif;color:#1F1619;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAF6F3;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#FFFFFF;border:1px solid #E8DDD5;border-radius:20px;overflow:hidden;box-shadow:0 12px 32px rgba(31,22,25,0.05);">
+          <!-- Top Editorial Accent Bar -->
+          <tr>
+            <td style="height:5px;background:linear-gradient(90deg,#1F1619 0%,#9E4765 50%,#1F1619 100%);background-color:#9E4765;"></td>
+          </tr>
+
+          <!-- Masthead -->
+          <tr>
+            <td style="padding:40px 44px 24px 44px;text-align:center;border-bottom:1px solid #F2EAE4;">
+              <p style="margin:0 0 6px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;letter-spacing:3.5px;text-transform:uppercase;color:#9E4765;">
+                CUSTOM MAGAZINE
+              </p>
+              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:13px;color:#7A686E;">
+                Bespoke Editorial Keepsakes
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding:38px 44px 20px 44px;">
+              <h1 style="margin:0 0 18px 0;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:normal;line-height:1.25;color:#1F1619;">
+                Thank you, ${customerName}.
+              </h1>
+              <p style="margin:0 0 24px 0;font-size:16px;line-height:1.75;color:#4A3A40;">
+                I have received your stories, favourite memories, and photographs for <strong style="color:#1F1619;">${herName}</strong>&rsquo;s custom magazine issue. I cannot wait to begin crafting each page.
+              </p>
+
+              <!-- Order Reference & Dossier Card -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FCF9F7;border:1px solid #EBE0D8;border-left:4px solid #9E4765;border-radius:12px;margin:0 0 28px 0;">
+                <tr>
+                  <td style="padding:24px 26px;">
+                    <p style="margin:0 0 6px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:10px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:#8C7A80;">
+                      ORDER REFERENCE
+                    </p>
+                    <p style="margin:0 0 20px 0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;letter-spacing:1.2px;color:#1F1619;">
+                      ${orderRef}
+                    </p>
+
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #EBE0D8;padding-top:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#4A3A40;">
+                      <tr>
+                        <td style="padding:6px 0;color:#7A686E;width:42%;">Featured Star</td>
+                        <td style="padding:6px 0;font-weight:600;color:#1F1619;text-align:right;">${herName}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;color:#7A686E;">Colour Direction</td>
+                        <td style="padding:6px 0;font-weight:600;color:#1F1619;text-align:right;">${colourTheme}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;color:#7A686E;">Photographs Received</td>
+                        <td style="padding:6px 0;font-weight:600;color:#1F1619;text-align:right;">${props.photoCount} ${props.photoCount === 1 ? "photo" : "photos"}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- What Happens Next -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;border:1px solid #F0E6DF;border-radius:12px;margin:0 0 24px 0;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <p style="margin:0 0 8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#9E4765;">
+                      What Happens Next
+                    </p>
+                    <p style="margin:0;font-size:14px;line-height:1.7;color:#5A484F;">
+                      I will carefully review every chapter and photograph you shared to make sure we have everything needed for the layout. Keep your order reference (<strong style="color:#1F1619;">${orderRef}</strong>) handy, and I will be in touch with you soon.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:15px;color:#6E5A61;">
+                Warmly,<br />
+                <span style="font-style:normal;font-weight:bold;color:#1F1619;">The Editorial Desk</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:22px 44px 32px 44px;border-top:1px solid #F2EAE4;text-align:center;">
+              <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;color:#96838A;line-height:1.6;">
+                Custom Magazine &bull; Bespoke Editorial Keepsakes<br />
+                Please keep this email for your records.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 
-  const text = `CUSTOM MAGAZINE
+  const text = `CUSTOM MAGAZINE — Bespoke Editorial Keepsakes
 
 Thank you, ${props.customerName}!
 
-I can't wait to create ${props.herName}'s magazine. I'll be in touch soon.
+I have received your stories, favourite memories, and photographs for ${props.herName}'s custom magazine issue. I cannot wait to begin crafting each page.
 
+ORDER SUMMARY
+----------------------------------------
 Order Reference: ${props.orderReference}
 Featured Star: ${props.herName}
-Colour Theme: ${props.colourTheme}
-Photos Uploaded: ${props.photoCount}
+Colour Direction: ${props.colourTheme}
+Photographs Received: ${props.photoCount}
+
+WHAT HAPPENS NEXT
+I will carefully review every chapter and photograph you shared and will be in touch with you soon regarding your magazine.
+
+Warmly,
+The Editorial Desk — Custom Magazine
 `;
 
   return { subject, html, text };
@@ -76,36 +167,116 @@ export function renderResumeOrderEmail(props: ResumeOrderEmailProps): {
   html: string;
   text: string;
 } {
-  const star = props.herName ? `${props.herName}'s` : "your";
-  const subject = `Resume ${star} custom magazine order`;
+  const hasStar = Boolean(props.herName && props.herName.trim().length > 0);
+  const starPlain = hasStar ? `${props.herName!.trim()}'s` : "your";
+  const starHtml = hasStar
+    ? `<strong style="color:#1F1619;">${escapeHtml(props.herName!.trim())}&rsquo;s</strong>`
+    : "your";
+  const greeting =
+    props.customerName && props.customerName.trim().length > 0
+      ? `Hello ${escapeHtml(props.customerName.trim())},`
+      : "Hello,";
+
+  const subject = `Continue ${starPlain} Custom Magazine brief`;
+  const safeUrl = escapeHtml(props.resumeUrl);
 
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><title>${subject}</title></head>
-<body style="margin:0;padding:0;background-color:#FAF6F3;font-family:Georgia,serif;color:#1F1619;">
-  <div style="max-width:560px;margin:40px auto;background:#FFFFFF;border:1px solid #EBE0D8;padding:40px;">
-    <p style="text-transform:uppercase;letter-spacing:3px;font-size:11px;color:#9E4765;margin:0 0 8px 0;font-family:sans-serif;">
-      CUSTOM MAGAZINE
-    </p>
-    <h1 style="font-size:24px;font-weight:normal;margin:0 0 16px 0;">
-      Pick up right where you left off
-    </h1>
-    <p style="font-size:15px;line-height:1.6;color:#4A3A40;margin:0 0 24px 0;">
-      Your progress and uploaded photos for ${star} magazine have been saved. Use the private link below to continue whenever you are ready:
-    </p>
-    <p style="margin:0 0 24px 0;">
-      <a href="${props.resumeUrl}" style="display:inline-block;background:#9E4765;color:#FFFFFF;text-decoration:none;padding:13px 26px;font-family:sans-serif;font-size:14px;font-weight:600;">
-        Resume Your Order
-      </a>
-    </p>
-    <p style="font-size:12px;color:#8C7A80;word-break:break-all;font-family:sans-serif;">
-      Or copy this link: ${props.resumeUrl}
-    </p>
-  </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF6F3;font-family:Georgia,'Times New Roman',serif;color:#1F1619;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAF6F3;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background-color:#FFFFFF;border:1px solid #E8DDD5;border-radius:20px;overflow:hidden;box-shadow:0 12px 32px rgba(31,22,25,0.05);">
+          <!-- Top Editorial Accent Bar -->
+          <tr>
+            <td style="height:5px;background:linear-gradient(90deg,#1F1619 0%,#9E4765 50%,#1F1619 100%);background-color:#9E4765;"></td>
+          </tr>
+
+          <!-- Masthead -->
+          <tr>
+            <td style="padding:36px 40px 22px 40px;text-align:center;border-bottom:1px solid #F2EAE4;">
+              <p style="margin:0 0 6px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;letter-spacing:3.5px;text-transform:uppercase;color:#9E4765;">
+                CUSTOM MAGAZINE
+              </p>
+              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:13px;color:#7A686E;">
+                Saved Editorial Draft
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding:36px 40px 28px 40px;">
+              <p style="margin:0 0 10px 0;font-size:15px;color:#7A686E;">
+                ${greeting}
+              </p>
+              <h1 style="margin:0 0 16px 0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:normal;line-height:1.3;color:#1F1619;">
+                Pick up right where you left off.
+              </h1>
+              <p style="margin:0 0 28px 0;font-size:15px;line-height:1.75;color:#4A3A40;">
+                Every answer, chapter, and photograph you have added so far for ${starHtml} custom magazine has been safely saved. Whenever you are ready to continue, open your private link below:
+              </p>
+
+              <!-- Primary CTA Button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px 0;">
+                <tr>
+                  <td align="center" style="border-radius:999px;background-color:#9E4765;">
+                    <a href="${safeUrl}" target="_blank" style="display:inline-block;padding:15px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.4px;color:#FFFFFF;text-decoration:none;border-radius:999px;">
+                      Continue Your Magazine Brief &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Direct Link Box -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FCF9F7;border:1px solid #EBE0D8;border-radius:12px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 6px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#8C7A80;">
+                      YOUR PRIVATE RESUME LINK
+                    </p>
+                    <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;word-break:break-all;color:#9E4765;">
+                      <a href="${safeUrl}" style="color:#9E4765;text-decoration:underline;">${safeUrl}</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px 30px 40px;border-top:1px solid #F2EAE4;text-align:center;">
+              <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;color:#96838A;line-height:1.6;">
+                Custom Magazine &bull; Bespoke Editorial Keepsakes<br />
+                This private link restores your saved session on any device.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 
-  const text = `CUSTOM MAGAZINE\n\nPick up right where you left off.\nResume your order here: ${props.resumeUrl}`;
+  const text = `CUSTOM MAGAZINE — Saved Editorial Draft
+
+${props.customerName ? `Hello ${props.customerName.trim()},` : "Hello,"}
+
+Pick up right where you left off.
+Your progress and uploaded photographs for ${starPlain} custom magazine have been safely saved.
+
+Use your private link below to continue whenever you are ready:
+${props.resumeUrl}
+
+Custom Magazine • Bespoke Editorial Keepsakes`;
+
   return { subject, html, text };
 }
 
@@ -128,44 +299,134 @@ export function renderAdminNewOrderEmail(props: AdminNewOrderEmailProps): {
   text: string;
 } {
   const subject = `[New Order] ${props.orderReference} — ${props.herName} (by ${props.customerName})`;
+  const safeRef = escapeHtml(props.orderReference);
+  const safeStar = escapeHtml(props.herName);
+  const safeCustomer = escapeHtml(props.customerName);
+  const safeEmail = escapeHtml(props.email);
+  const safePhone = escapeHtml(props.phoneE164);
+  const safeColour = escapeHtml(props.colourTheme);
+  const safeAdminUrl = escapeHtml(props.adminOrderUrl);
+  const safeDriveUrl = props.driveFolderUrl
+    ? escapeHtml(props.driveFolderUrl)
+    : null;
 
-  const driveButtonHtml = props.driveFolderUrl
-    ? `<a href="${props.driveFolderUrl}" style="background:#9E4765;color:#FFFFFF;text-decoration:none;padding:12px 22px;font-size:14px;font-weight:600;margin-left:10px;">
-        Open Google Drive Photos (${props.photoCount})
-      </a>`
+  const driveButtonHtml = safeDriveUrl
+    ? `<td style="padding-left:10px;">
+        <a href="${safeDriveUrl}" target="_blank" style="display:inline-block;background-color:#9E4765;color:#FFFFFF;text-decoration:none;padding:13px 22px;border-radius:999px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;">
+          Open Google Drive Photos (${props.photoCount})
+        </a>
+      </td>`
     : "";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><title>${subject}</title></head>
-<body style="margin:0;padding:24px;background:#FAF6F3;font-family:sans-serif;color:#1F1619;">
-  <div style="max-width:600px;margin:0 auto;background:#FFFFFF;border:1px solid #EBE0D8;padding:32px;">
-    <p style="text-transform:uppercase;letter-spacing:2.5px;font-size:11px;color:#9E4765;margin:0 0 6px 0;">
-      CUSTOM MAGAZINE  •  EDITORIAL DESK
-    </p>
-    <h2 style="margin:0 0 18px 0;color:#1F1619;font-family:Georgia,serif;font-weight:normal;font-size:24px;">
-      New Magazine Order Completed
-    </h2>
-    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.7;">
-      <strong>Reference:</strong> ${props.orderReference}<br/>
-      <strong>Featured Star:</strong> ${props.herName}<br/>
-      <strong>Ordered By:</strong> ${props.customerName}<br/>
-      <strong>Customer Email:</strong> ${props.email}<br/>
-      <strong>Customer Phone:</strong> ${props.phoneE164}<br/>
-      <strong>Colour Theme:</strong> ${props.colourTheme}<br/>
-      <strong>Photos Uploaded:</strong> ${props.photoCount}${props.driveFolderUrl ? `<br/><strong>Google Drive Folder:</strong> <a href="${props.driveFolderUrl}" style="color:#9E4765;">${props.driveFolderUrl}</a>` : ""}
-    </p>
-    <p style="margin:24px 0 0 0;">
-      <a href="${props.adminOrderUrl}" style="background:#1F1619;color:#FFFFFF;text-decoration:none;padding:12px 22px;font-size:14px;font-weight:600;">
-        Open Order Brief in Admin
-      </a>
-      ${driveButtonHtml}
-    </p>
-  </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF6F3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1F1619;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAF6F3;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background-color:#FFFFFF;border:1px solid #E8DDD5;border-radius:20px;overflow:hidden;box-shadow:0 12px 32px rgba(31,22,25,0.05);">
+          <!-- Top Editorial Accent Bar -->
+          <tr>
+            <td style="height:5px;background-color:#1F1619;"></td>
+          </tr>
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:32px 40px 20px 40px;border-bottom:1px solid #F2EAE4;">
+              <p style="margin:0 0 6px 0;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#9E4765;">
+                CUSTOM MAGAZINE &bull; EDITORIAL DESK
+              </p>
+              <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:normal;color:#1F1619;">
+                New Magazine Order Submitted
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Order Details Table -->
+          <tr>
+            <td style="padding:28px 40px 32px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FCF9F7;border:1px solid #EBE0D8;border-radius:14px;margin:0 0 26px 0;">
+                <tr>
+                  <td style="padding:22px 26px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#4A3A40;">
+                      <tr>
+                        <td style="padding:8px 0;color:#7A686E;width:38%;border-bottom:1px solid #F2EAE4;">Order Reference</td>
+                        <td style="padding:8px 0;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;color:#1F1619;border-bottom:1px solid #F2EAE4;">${safeRef}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Featured Star</td>
+                        <td style="padding:8px 0;font-weight:600;color:#1F1619;border-bottom:1px solid #F2EAE4;">${safeStar}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Ordered By</td>
+                        <td style="padding:8px 0;font-weight:600;color:#1F1619;border-bottom:1px solid #F2EAE4;">${safeCustomer}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Customer Email</td>
+                        <td style="padding:8px 0;border-bottom:1px solid #F2EAE4;"><a href="mailto:${safeEmail}" style="color:#9E4765;text-decoration:none;font-weight:500;">${safeEmail}</a></td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Customer Phone</td>
+                        <td style="padding:8px 0;color:#1F1619;border-bottom:1px solid #F2EAE4;">${safePhone}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;color:#7A686E;border-bottom:1px solid #F2EAE4;">Colour Direction</td>
+                        <td style="padding:8px 0;color:#1F1619;border-bottom:1px solid #F2EAE4;">${safeColour}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;color:#7A686E;">Photographs Uploaded</td>
+                        <td style="padding:8px 0;font-weight:600;color:#1F1619;">${props.photoCount} ${props.photoCount === 1 ? "photo" : "photos"}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action Buttons -->
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <a href="${safeAdminUrl}" target="_blank" style="display:inline-block;background-color:#1F1619;color:#FFFFFF;text-decoration:none;padding:13px 24px;border-radius:999px;font-size:13px;font-weight:600;">
+                      Open Order Brief in Admin &rarr;
+                    </a>
+                  </td>
+                  ${driveButtonHtml}
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:18px 40px 26px 40px;border-top:1px solid #F2EAE4;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#96838A;">
+                Custom Magazine Editorial Desk &bull; Automated Order Completion Notification
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 
-  const text = `New Magazine Order Completed\nReference: ${props.orderReference}\nFeatured Star: ${props.herName}\nOrdered By: ${props.customerName}\nEmail: ${props.email}\nPhone: ${props.phoneE164}\nColour Theme: ${props.colourTheme}\nPhotos: ${props.photoCount}${props.driveFolderUrl ? `\nGoogle Drive Folder: ${props.driveFolderUrl}` : ""}\nAdmin Link: ${props.adminOrderUrl}`;
+  const text = `CUSTOM MAGAZINE • EDITORIAL DESK
+New Magazine Order Completed
+
+Order Reference: ${props.orderReference}
+Featured Star: ${props.herName}
+Ordered By: ${props.customerName}
+Customer Email: ${props.email}
+Customer Phone: ${props.phoneE164}
+Colour Direction: ${props.colourTheme}
+Photographs Uploaded: ${props.photoCount}
+${props.driveFolderUrl ? `Google Drive Folder: ${props.driveFolderUrl}\n` : ""}Admin Order Link: ${props.adminOrderUrl}`;
 
   return { subject, html, text };
 }
@@ -187,33 +448,61 @@ export function renderAdminCriticalAlertEmail(
 } {
   const timestamp = new Date().toISOString();
   const subject = `[Custom Magazine Alert] ${props.context}: ${props.summary.slice(0, 80)}`;
+  const safeContext = escapeHtml(props.context);
+  const safeSummary = escapeHtml(props.summary);
+  const safeRef = props.orderReference ? escapeHtml(props.orderReference) : null;
+  const safeDetails = props.details ? escapeHtml(props.details) : null;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><title>${subject}</title></head>
-<body style="margin:0;padding:24px;background:#FAF6F3;font-family:sans-serif;color:#1F1619;">
-  <div style="max-width:600px;margin:0 auto;background:#FFFFFF;border:1px solid #F5C2C7;border-left:4px solid #B91C1C;padding:32px;">
-    <p style="text-transform:uppercase;letter-spacing:2.5px;font-size:11px;color:#B91C1C;margin:0 0 6px 0;font-weight:bold;">
-      CUSTOM MAGAZINE  •  SYSTEM ALERT
-    </p>
-    <h2 style="margin:0 0 14px 0;color:#1F1619;font-family:Georgia,serif;font-weight:normal;font-size:22px;">
-      ${props.context}
-    </h2>
-    <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#4A3A40;">
-      <strong>Summary:</strong> ${props.summary}<br/>
-      <strong>Timestamp (UTC):</strong> ${timestamp}
-      ${props.orderReference ? `<br/><strong>Order Reference:</strong> ${props.orderReference}` : ""}
-    </p>
-    ${
-      props.details
-        ? `<pre style="background:#FCF9F7;border:1px solid #EFE6E0;padding:14px;font-size:12px;overflow-x:auto;white-space:pre-wrap;color:#1F1619;">${props.details}</pre>`
-        : ""
-    }
-  </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF6F3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1F1619;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAF6F3;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background-color:#FFFFFF;border:1px solid #F5C2C7;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="height:5px;background-color:#B91C1C;"></td>
+          </tr>
+          <tr>
+            <td style="padding:28px 36px;">
+              <p style="margin:0 0 6px 0;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#B91C1C;">
+                CUSTOM MAGAZINE &bull; SYSTEM ALERT
+              </p>
+              <h2 style="margin:0 0 18px 0;font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:22px;color:#1F1619;">
+                ${safeContext}
+              </h2>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFF8F8;border:1px solid #F5C2C7;border-radius:10px;margin:0 0 18px 0;">
+                <tr>
+                  <td style="padding:16px 20px;font-size:13px;line-height:1.65;color:#4A3A40;">
+                    <strong style="color:#1F1619;">Summary:</strong> ${safeSummary}<br />
+                    <strong style="color:#1F1619;">Timestamp (UTC):</strong> ${timestamp}
+                    ${safeRef ? `<br /><strong style="color:#1F1619;">Order Reference:</strong> ${safeRef}` : ""}
+                  </td>
+                </tr>
+              </table>
+              ${
+                safeDetails
+                  ? `<pre style="margin:0;background:#FCF9F7;border:1px solid #EFE6E0;border-radius:10px;padding:14px;font-size:11px;line-height:1.5;overflow-x:auto;white-space:pre-wrap;color:#1F1619;">${safeDetails}</pre>`
+                  : ""
+              }
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 
-  const text = `CUSTOM MAGAZINE SYSTEM ALERT\nContext: ${props.context}\nSummary: ${props.summary}\nTimestamp: ${timestamp}${props.orderReference ? `\nOrder Reference: ${props.orderReference}` : ""}${props.details ? `\n\nDetails:\n${props.details}` : ""}`;
+  const text = `CUSTOM MAGAZINE • SYSTEM ALERT
+Context: ${props.context}
+Summary: ${props.summary}
+Timestamp (UTC): ${timestamp}${props.orderReference ? `\nOrder Reference: ${props.orderReference}` : ""}${props.details ? `\n\nDetails:\n${props.details}` : ""}`;
 
   return { subject, html, text };
 }

@@ -91,12 +91,20 @@ export class ResendMailer implements MailerAdapter {
       });
 
       if (res.error) {
+        console.error(
+          `[ResendMailer] Failed to send "${input.template}" to ${input.to}:`,
+          res.error
+        );
         return { ok: false, error: res.error.message };
       }
 
       return { ok: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Resend API error";
+      console.error(
+        `[ResendMailer] Exception sending "${input.template}" to ${input.to}:`,
+        msg
+      );
       return { ok: false, error: msg };
     }
   }
@@ -106,7 +114,6 @@ export class ResendMailer implements MailerAdapter {
       const resend = this.getClient();
       const domains = await resend.domains.list();
       if (domains.error) {
-        // Sending-only Resend API keys return "This API key is restricted to only send emails" on domains.list()
         if (
           domains.error.message
             .toLowerCase()
@@ -119,9 +126,32 @@ export class ResendMailer implements MailerAdapter {
         }
         return { ok: false, message: domains.error.message };
       }
+
+      const domainList = domains.data?.data ?? [];
+      const senderDomainMatch = /@([a-zA-Z0-9.-]+)/.exec(env.MAIL_FROM);
+      const senderDomain = senderDomainMatch?.[1]?.toLowerCase();
+
+      if (senderDomain && senderDomain !== "resend.dev") {
+        const matched = domainList.find(
+          (d) => d.name.toLowerCase() === senderDomain
+        );
+        if (!matched) {
+          return {
+            ok: false,
+            message: `Domain "${senderDomain}" in MAIL_FROM is not registered on this Resend account.`,
+          };
+        }
+        if (matched.status !== "verified") {
+          return {
+            ok: false,
+            message: `Domain "${senderDomain}" is present on Resend but status is "${matched.status}".`,
+          };
+        }
+      }
+
       return {
         ok: true,
-        message: `Resend connected (sending from ${env.MAIL_FROM}).`,
+        message: `Resend connected & verified (sending from ${env.MAIL_FROM}).`,
       };
     } catch (err) {
       return {

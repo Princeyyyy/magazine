@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDraftByToken, saveDraftAnswers } from "@/lib/orders";
 import { getMailer } from "@/lib/services/mailer";
+import { getAdminNotifier } from "@/lib/services/admin-notifier";
 import { renderResumeOrderEmail } from "@/emails/templates";
 import { env } from "@/env";
 import { handleApiError, getClientIp } from "@/lib/api-response";
 import { checkRateLimit } from "@/lib/security";
-import { NotFoundError, RateLimitError, ValidationError } from "@/lib/errors";
+import {
+  AppError,
+  NotFoundError,
+  RateLimitError,
+  ValidationError,
+} from "@/lib/errors";
 import { z } from "zod";
 
 const emailSchema = z.string().trim().email("Please enter a valid email address.");
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
     });
 
     const mailer = getMailer();
-    await mailer.sendMail({
+    const mailResult = await mailer.sendMail({
       orderId: draft.orderId,
       to: parsedEmail.data,
       subject: emailContent.subject,
@@ -66,6 +72,20 @@ export async function POST(req: NextRequest) {
       text: emailContent.text,
       template: "customer_resume_link",
     });
+
+    if (!mailResult.ok) {
+      void getAdminNotifier().notifyCriticalIssue({
+        context: "Customer Resume Email Delivery Failed",
+        summary: mailResult.error || "Resend rejected resume link email.",
+        orderReference: draft.reference,
+        orderId: draft.orderId,
+      });
+      throw new AppError(
+        "EMAIL_SEND_FAILED",
+        "Could not send the email right now. You can copy your private resume link directly above.",
+        502
+      );
+    }
 
     return NextResponse.json({
       ok: true,
