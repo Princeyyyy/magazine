@@ -1,62 +1,72 @@
 import { describe, it, expect } from "vitest";
-import { parseEnv, getServiceModeSummary, getAdminAllowlist } from "./env";
+import {
+  parseEnv,
+  getServiceModeSummary,
+  getAdminAllowlist,
+  getPrimaryAdminEmail,
+  getCompletionCcEmails,
+} from "./env";
 
-describe("Environment Validation & Service Adapter Fallback Selection", () => {
-  it("starts cleanly with zero external credentials configured and falls back to local adapters", () => {
-    const config = parseEnv({});
-    const summary = getServiceModeSummary(config);
+describe("Environment Validation & Service Mode Detection", () => {
+  it("falls back cleanly to local/mock adapters when external env vars are empty", () => {
+    const parsed = parseEnv({
+      NODE_ENV: "development",
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+      DATABASE_URL: "",
+      GOOGLE_OAUTH_CLIENT_ID: "",
+      RESEND_API_KEY: "",
+      ADMIN_NOTIFY_EMAIL: "",
+    });
 
+    const summary = getServiceModeSummary(parsed);
     expect(summary.isDevMode).toBe(true);
     expect(summary.database).toBe("pglite_local");
     expect(summary.photoStorage).toBe("local");
+    expect(summary.mailer).toBe("resend" === summary.mailer ? "resend" : "console");
     expect(summary.mailer).toBe("console");
-    expect(summary.whatsapp).toBe("link");
-    expect(summary.notifier.console).toBe(true);
-    expect(summary.googleAuth).toBe("dev_bypass");
-    expect(summary.turnstile).toBe("disabled");
+    expect(summary.notifier.email).toBe(true); // falls back to first email in ADMIN_EMAILS ("admin@example.com")
   });
 
-  it("selects live adapters when credentials are provided in environment", () => {
-    const config = parseEnv({
+  it("supports NEXT_APP_URL (for Vercel) and normalizes trailing slashes", () => {
+    const parsed = parseEnv({
       NODE_ENV: "production",
-      DATABASE_URL: "postgresql://user:pass@ep-cool.us-east-2.aws.neon.tech/neondb",
+      NEXT_APP_URL: "https://magazine.vercel.app/",
+    });
+
+    expect(parsed.NEXT_APP_URL).toBe("https://magazine.vercel.app");
+    expect(parsed.NEXT_PUBLIC_APP_URL).toBe("https://magazine.vercel.app");
+  });
+
+  it("switches to live adapters when credentials are provided", () => {
+    const parsed = parseEnv({
+      NODE_ENV: "production",
+      NEXT_APP_URL: "https://hercustommagazine.com",
+      DATABASE_URL: "postgresql://user:pass@ep-cool.neon.tech/neondb?sslmode=require",
       GOOGLE_OAUTH_CLIENT_ID: "client-id",
       GOOGLE_OAUTH_CLIENT_SECRET: "client-secret",
       GOOGLE_DRIVE_REFRESH_TOKEN: "refresh-token",
       DRIVE_ROOT_FOLDER_ID: "folder-123",
-      RESEND_API_KEY: "re_123456",
-      MAIL_FROM: "Custom Magazine <orders@custommagazine.com>",
-      ADMIN_NOTIFY_EMAIL: "editor@custommagazine.com",
-      WHATSAPP_CLOUD_ENABLED: "true",
-      WHATSAPP_PHONE_NUMBER_ID: "10987654321",
-      WHATSAPP_ACCESS_TOKEN: "EAA_token",
-      WHATSAPP_TEMPLATE_NAME: "order_status_update",
-      TELEGRAM_BOT_TOKEN: "12345:ABCDEF",
-      TELEGRAM_CHAT_ID: "987654",
-      AUTH_GOOGLE_ID: "google-auth-id",
-      AUTH_GOOGLE_SECRET: "google-auth-secret",
-      TURNSTILE_SITE_KEY: "0x4AAAAAA",
-      TURNSTILE_SECRET_KEY: "0x4BBBBBB",
+      RESEND_API_KEY: "re_123456789",
+      ADMIN_EMAILS: "princemumo80@gmail.com,barbaratrizer60@gmail.com",
+      ADMIN_NOTIFY_EMAIL: "princemumo80@gmail.com",
     });
 
-    const summary = getServiceModeSummary(config);
-
+    const summary = getServiceModeSummary(parsed);
     expect(summary.isDevMode).toBe(false);
     expect(summary.database).toBe("postgres");
     expect(summary.photoStorage).toBe("drive");
     expect(summary.mailer).toBe("resend");
-    expect(summary.whatsapp).toBe("cloud");
     expect(summary.notifier.email).toBe(true);
-    expect(summary.notifier.telegram).toBe(true);
-    expect(summary.googleAuth).toBe("google");
-    expect(summary.turnstile).toBe("enabled");
+    expect(getPrimaryAdminEmail(parsed)).toBe("princemumo80@gmail.com");
+    expect(getCompletionCcEmails(parsed)).toEqual(["barbaratrizer60@gmail.com"]);
   });
 
-  it("parses ADMIN_EMAILS allowlist normalized to lowercase", () => {
-    const config = parseEnv({
-      ADMIN_EMAILS: "  Alice@Example.com, BOB@example.com ,  ",
+  it("parses comma-separated ADMIN_EMAILS into normalized lowercase list", () => {
+    const parsed = parseEnv({
+      ADMIN_EMAILS: " Alice@Example.com , BOB@example.com , ",
     });
-    expect(getAdminAllowlist(config)).toEqual([
+
+    expect(getAdminAllowlist(parsed)).toEqual([
       "alice@example.com",
       "bob@example.com",
     ]);

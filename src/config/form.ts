@@ -1058,13 +1058,13 @@ export const FORM_PAGES: readonly PageConfig[] = [
           },
           {
             key: "phone_e164",
-            label: "Your phone or WhatsApp number",
+            label: "Your phone number",
             type: "phone",
             required: true,
             defaultCountry: "KE",
             placeholder: "712 345 678",
             errorMessage:
-              "Please enter a valid phone or WhatsApp number with country code.",
+              "Please enter a valid phone number with country code.",
           },
           {
             key: "permission_consent",

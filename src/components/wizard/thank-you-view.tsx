@@ -6,7 +6,6 @@ import { BrandLogoTransparent } from "@/components/icons/SectionIcons";
 
 interface ThankYouViewProps {
   reference: string;
-  whatsAppUrl?: string;
   herName?: string;
 }
 

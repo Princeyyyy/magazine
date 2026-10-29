@@ -7,21 +7,16 @@ import { CheckCircle2, AlertCircle, Play } from "lucide-react";
 
 interface ServiceModeSummary {
   isDevMode: boolean;
+  appUrl?: string;
   database: "postgres" | "pglite_local";
   neonBranch?: string | null;
-  neonFunctionUrl?: string | null;
-  neonFunctions?: "live" | "unconfigured";
   photoStorage: "drive" | "local";
   mailer: "resend" | "console";
-  whatsapp?: "cloud" | "link" | "console";
   notifier: {
     email: boolean;
-    telegram: boolean;
     console: boolean;
   };
   adminAuth?: "password" | "default_password";
-  googleAuth: "google" | "dev_bypass";
-  turnstile: "enabled" | "disabled";
 }
 
 interface DevOutboxItem {
@@ -45,13 +40,7 @@ export function AdminSettingsClient({
   >({});
 
   const runServiceTest = async (
-    service:
-      | "database"
-      | "neon_functions"
-      | "drive"
-      | "email"
-      | "whatsapp"
-      | "notifier"
+    service: "database" | "drive" | "email" | "notifier"
   ) => {
     setTestResults((prev) => ({
       ...prev,
@@ -91,13 +80,7 @@ export function AdminSettingsClient({
   };
 
   const services: {
-    id:
-      | "database"
-      | "neon_functions"
-      | "drive"
-      | "email"
-      | "whatsapp"
-      | "notifier";
+    id: "database" | "drive" | "email" | "notifier";
     title: string;
     activeAdapter: string;
     isLive: boolean;
@@ -112,18 +95,7 @@ export function AdminSettingsClient({
           : "Embedded PGlite (./.local-db)",
       isLive: modeSummary.database === "postgres",
       description:
-        "Stores customer orders, questionnaire answers, photo metadata, admin notes, and status history.",
-    },
-    {
-      id: "neon_functions",
-      title: "Neon Functions",
-      activeAdapter:
-        modeSummary.neonFunctions === "live"
-          ? `Hello World (${modeSummary.neonFunctionUrl})`
-          : "Unconfigured (NEON_FUNCTION_HELLO_BASE_URL)",
-      isLive: modeSummary.neonFunctions === "live",
-      description:
-        "Serverless compute function deployed on Neon and wired via NEON_FUNCTION_HELLO_BASE_URL.",
+        "Stores customer orders, questionnaire answers, photo metadata, and status workflow history.",
     },
     {
       id: "drive",
@@ -134,32 +106,28 @@ export function AdminSettingsClient({
           : "LocalDiskStorage (./.local-uploads)",
       isLive: modeSummary.photoStorage === "drive",
       description:
-        "Handles resumable chunked photo uploads, per-order folders, and private authenticated previews.",
+        "Handles resumable chunked photo uploads, per-order Google Drive folders, and private authenticated previews.",
     },
     {
       id: "email",
       title: "Mailer Adapter (Resend)",
       activeAdapter:
         modeSummary.mailer === "resend"
-          ? "ResendMailer (Live Email — works without a domain via onboarding@resend.dev)"
+          ? "ResendMailer (Custom Magazine <noreply@cleanplay.app>)"
           : "ConsoleMailer (Terminal + dev_outbox)",
       isLive: modeSummary.mailer === "resend",
       description:
-        "Sends customer order confirmations, resume-order links, and custom emails. Works immediately on Resend's free tier using onboarding@resend.dev (no custom domain needed).",
+        "Sends customer order confirmations, resume-order links, and admin order notifications via Resend.",
     },
     {
       id: "notifier",
       title: "Admin Notifier Adapter",
-      activeAdapter: [
-        modeSummary.notifier.email ? "Admin Email" : null,
-        modeSummary.notifier.telegram ? "Telegram Bot" : null,
-        modeSummary.notifier.console ? "Console Fallback" : null,
-      ]
-        .filter(Boolean)
-        .join(" + "),
-      isLive: modeSummary.notifier.email || modeSummary.notifier.telegram,
+      activeAdapter: modeSummary.notifier.email
+        ? "Admin Email + CC Routing"
+        : "Console Fallback",
+      isLive: modeSummary.notifier.email,
       description:
-        "Alerts you immediately whenever a customer submits a new magazine order.",
+        "Sends completed order briefs to princemumo80@gmail.com (CCing all other ADMIN_EMAILS) and routes system alerts exclusively to princemumo80@gmail.com.",
     },
   ];
 
@@ -239,71 +207,71 @@ export function AdminSettingsClient({
           <span className="text-[#7A686E] block mb-1">Database Engine</span>
           <strong className="text-[#1F1619]">
             {modeSummary.database === "postgres"
-              ? "Supabase / Neon PostgreSQL (DATABASE_URL)"
+              ? "Neon PostgreSQL (DATABASE_URL)"
               : "Embedded PGlite PostgreSQL (./.local-db)"}
           </strong>
         </div>
         <div>
           <span className="text-[#7A686E] block mb-1">Admin Authentication</span>
           <strong className="text-[#1F1619]">
-            ADMIN_EMAILS + ADMIN_PASSWORD
+            ADMIN_EMAILS + ADMIN_PASSWORD (14-Day Signed Cookie)
           </strong>
         </div>
         <div>
-          <span className="text-[#7A686E] block mb-1">Cloudflare Turnstile</span>
+          <span className="text-[#7A686E] block mb-1">Application URL</span>
           <strong className="text-[#1F1619]">
-            {modeSummary.turnstile === "enabled"
-              ? "Enabled"
-              : "Disabled (Honeypot + Rate Limiting Active)"}
+            {modeSummary.appUrl || "http://localhost:3000"}
           </strong>
         </div>
       </div>
 
       {/* ConsoleMailer Dev Outbox Table */}
-      <section className="rounded-3xl border border-[#EFE6E0] bg-white p-6 sm:p-8 shadow-2xs space-y-5">
-        <div>
-          <h2 className="font-serif text-2xl text-[#1F1619]">
-            Dev Outbox ({outboxEmails.length})
-          </h2>
-          <p className="text-xs text-[#7A686E]">
-            Emails captured locally when <code className="font-mono">RESEND_API_KEY</code> is not configured.
-          </p>
-        </div>
+      {modeSummary.mailer !== "resend" && (
+        <section className="rounded-3xl border border-[#EFE6E0] bg-white p-6 sm:p-8 shadow-2xs space-y-5">
+          <div>
+            <h2 className="font-serif text-2xl text-[#1F1619]">
+              Dev Outbox ({outboxEmails.length})
+            </h2>
+            <p className="text-xs text-[#7A686E]">
+              Emails captured locally when <code className="font-mono">RESEND_API_KEY</code> is not configured.
+            </p>
+          </div>
 
-        {outboxEmails.length === 0 ? (
-          <p className="text-xs italic text-[#96838A]">
-            No emails in dev_outbox yet. Submit an order or send a resume link to see captured emails here.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {outboxEmails.map((mail) => (
-              <div
-                key={mail.id}
-                className="rounded-2xl border border-[#EFE6E0] bg-[#FCF9F7] p-4 space-y-2"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div>
-                    <span className="font-semibold text-[#1F1619]">
-                      To: {mail.toEmail}
-                    </span>
-                    <span className="mx-2 text-[#D9C8C0]">|</span>
-                    <span className="text-[#9E4765] font-medium">
-                      {mail.subject}
+          {outboxEmails.length === 0 ? (
+            <p className="text-xs italic text-[#96838A]">
+              No emails in dev_outbox yet.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {outboxEmails.map((mail) => (
+                <div
+                  key={mail.id}
+                  className="rounded-2xl border border-[#EFE6E0] bg-[#FCF9F7] p-4 space-y-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="font-semibold text-[#1F1619]">
+                        To: {mail.toEmail}
+                      </span>
+                      <span className="mx-2 text-[#D9C8C0]">|</span>
+                      <span className="text-[#9E4765] font-medium">
+                        {mail.subject}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-[#8C7A80]">
+                      {mail.template} &bull;{" "}
+                      {new Date(mail.createdAt).toLocaleString("en-GB")}
                     </span>
                   </div>
-                  <span className="text-[11px] text-[#8C7A80]">
-                    {mail.template} &bull;{" "}
-                    {new Date(mail.createdAt).toLocaleString("en-GB")}
-                  </span>
+                  <pre className="text-xs text-[#4A3A40] whitespace-pre-wrap font-sans bg-white p-3 rounded-xl border border-[#F3ECE7]">
+                    {mail.textBody}
+                  </pre>
                 </div>
-                <pre className="text-xs text-[#4A3A40] whitespace-pre-wrap font-sans bg-white p-3 rounded-xl border border-[#F3ECE7]">
-                  {mail.textBody}
-                </pre>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

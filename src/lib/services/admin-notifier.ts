@@ -1,5 +1,4 @@
 import {
-  env,
   getPrimaryAdminEmail,
   getCompletionCcEmails,
 } from "@/env";
@@ -23,7 +22,7 @@ export class StandardAdminNotifier implements AdminNotifierAdapter {
   async notifyNewOrder(payload: AdminNewOrderEmailProps): Promise<void> {
     await ensureDbReady();
 
-    // 1. Order completion email: send to primary admin (princemumo80@gmail.com)
+    // Order completion email: send to primary admin (princemumo80@gmail.com)
     // and CC all other emails configured in ADMIN_EMAILS
     const primaryAdmin = getPrimaryAdminEmail();
     const ccAdmins = getCompletionCcEmails();
@@ -44,35 +43,6 @@ export class StandardAdminNotifier implements AdminNotifierAdapter {
       console.info(
         `[AdminNotifier Console] New order ${payload.orderReference} for ${payload.herName}`
       );
-    }
-
-    // 2. Optional Telegram Bot notification
-    if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
-      try {
-        const text = [
-          `New Custom Magazine Order!`,
-          `Reference: ${payload.orderReference}`,
-          `Featured Star: ${payload.herName}`,
-          `Ordered By: ${payload.customerName}`,
-          `Colour Theme: ${payload.colourTheme}`,
-          `Photos: ${payload.photoCount}`,
-          `Admin Link: ${payload.adminOrderUrl}`,
-        ].join("\n");
-
-        await fetch(
-          `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: env.TELEGRAM_CHAT_ID,
-              text,
-            }),
-          }
-        );
-      } catch (err) {
-        console.error("Telegram notification error:", err);
-      }
     }
   }
 
@@ -107,37 +77,17 @@ export class StandardAdminNotifier implements AdminNotifierAdapter {
   }
 
   async testConnection(): Promise<{ ok: boolean; message: string }> {
-    const parts: string[] = [];
     const primaryAdmin = getPrimaryAdminEmail();
     const ccAdmins = getCompletionCcEmails();
     if (primaryAdmin) {
-      parts.push(
-        `Completion To: ${primaryAdmin}${ccAdmins.length > 0 ? ` (CC: ${ccAdmins.join(", ")})` : ""} | Alerts Only To: ${primaryAdmin}`
-      );
-    }
-    if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
-      try {
-        const res = await fetch(
-          `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`
-        );
-        if (res.ok) {
-          parts.push("Telegram Bot verified");
-        } else {
-          return { ok: false, message: "Telegram Bot token failed verification." };
-        }
-      } catch (err) {
-        return {
-          ok: false,
-          message: err instanceof Error ? err.message : "Telegram check failed",
-        };
-      }
-    }
-    if (parts.length === 0) {
-      parts.push("Console fallback");
+      return {
+        ok: true,
+        message: `AdminNotifier active — Completion To: ${primaryAdmin}${ccAdmins.length > 0 ? ` (CC: ${ccAdmins.join(", ")})` : ""} | Alerts Only To: ${primaryAdmin}`,
+      };
     }
     return {
       ok: true,
-      message: `AdminNotifier active via: ${parts.join(" + ")}`,
+      message: "AdminNotifier active via Console fallback.",
     };
   }
 }

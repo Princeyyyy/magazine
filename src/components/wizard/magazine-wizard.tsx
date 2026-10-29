@@ -106,7 +106,6 @@ export function MagazineWizard() {
   const [draftToken, setDraftToken] = useState<string>("");
   const [orderReference, setOrderReference] = useState<string>("");
   const [orderStatus, setOrderStatus] = useState<string>("draft");
-  const [whatsAppUrl, setWhatsAppUrl] = useState<string>("");
   const [isDevMode, setIsDevMode] = useState<boolean>(
     process.env.NODE_ENV !== "production"
   );
@@ -211,7 +210,6 @@ export function MagazineWizard() {
             status: string;
             values: Record<string, unknown>;
             photos: UploadedPhotoItem[];
-            whatsAppUrl: string;
           };
         };
 
@@ -224,7 +222,6 @@ export function MagazineWizard() {
         setDraftToken(data.draft.draftToken);
         setOrderReference(data.draft.reference);
         setOrderStatus(data.draft.status);
-        setWhatsAppUrl(data.draft.whatsAppUrl);
         setPhotos(data.draft.photos);
 
         const computedMaxStep = computeInitialHighestStep(
@@ -598,7 +595,6 @@ export function MagazineWizard() {
 
       const data = (await res.json()) as {
         reference?: string;
-        whatsAppUrl?: string;
         herName?: string;
         error?: {
           message?: string;
@@ -622,7 +618,6 @@ export function MagazineWizard() {
       }
 
       setOrderReference(data.reference);
-      if (data.whatsAppUrl) setWhatsAppUrl(data.whatsAppUrl);
       setOrderStatus("submitted");
       showEditorialToast(
         "Magazine brief submitted",
@@ -661,7 +656,6 @@ export function MagazineWizard() {
       <div className="py-8 animate-editorial-in">
         <ThankYouView
           reference={orderReference}
-          whatsAppUrl={whatsAppUrl}
           herName={String(values["her_name"] || "")}
         />
       </div>

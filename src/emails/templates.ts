@@ -4,7 +4,6 @@ export interface OrderConfirmationEmailProps {
   orderReference: string;
   colourTheme: string;
   photoCount: number;
-  whatsAppUrl?: string;
 }
 
 export function renderCustomerConfirmationEmail(props: OrderConfirmationEmailProps): {

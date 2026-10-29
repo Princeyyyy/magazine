@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
+    "db:clear": "tsx scripts/clear.ts",
     "drive:auth": "tsx scripts/drive-auth.ts"
   },
   "dependencies": {

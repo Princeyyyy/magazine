@@ -1,29 +1,60 @@
 import { z } from "zod";
 
-const emptyToUndefined = (val: unknown) =>
-  typeof val === "string" && val.trim() === "" ? undefined : val;
+/**
+ * Helper for optional string env vars where an empty string `""` in `.env`
+ * should be treated as `undefined` so local/mock adapters activate cleanly.
+ */
+const optionalString = z.preprocess(
+  (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
+  z.string().trim().min(1).optional()
+);
 
-const optionalString = z.preprocess(emptyToUndefined, z.string().min(1).optional());
-const optionalEmail = z.preprocess(emptyToUndefined, z.string().email().optional());
-const optionalUrl = z.preprocess(emptyToUndefined, z.string().url().optional());
+const optionalUrl = z.preprocess(
+  (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
+  z.string().trim().url().optional()
+);
 
 export const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  NEXT_PUBLIC_APP_URL: optionalUrl.default("http://localhost:3000"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
 
-  // Database (Neon or Supabase PostgreSQL in production; if empty locally, uses embedded PGlite at ./.local-db)
+  // Supports both NEXT_APP_URL (Vercel server env) and NEXT_PUBLIC_APP_URL
+  NEXT_APP_URL: optionalUrl,
+  NEXT_PUBLIC_APP_URL: optionalUrl,
+
+  // Database (Neon Lakebase Postgres or local PGlite when omitted)
   DATABASE_URL: optionalString,
   DATABASE_URL_UNPOOLED: optionalString,
   NEON_BRANCH: optionalString,
-  NEON_FUNCTION_HELLO_BASE_URL: optionalUrl,
 
-  // Admin Auth (ADMIN_EMAILS + ADMIN_PASSWORD)
-  AUTH_SECRET: optionalString.default("dev-secret-change-in-production-at-least-32-chars"),
-  AUTH_GOOGLE_ID: optionalString,
-  AUTH_GOOGLE_SECRET: optionalString,
-  ADMIN_EMAILS: optionalString.default("admin@example.com"),
-  ADMIN_PASSWORD: optionalString.default("admin123"),
-  ADMIN_NOTIFY_EMAIL: optionalEmail,
+  // Admin Auth
+  AUTH_SECRET: z
+    .preprocess(
+      (val) =>
+        typeof val === "string" && val.trim() !== ""
+          ? val.trim()
+          : "dev-secret-change-in-production-at-least-32-chars",
+      z.string().min(16)
+    )
+    .default("dev-secret-change-in-production-at-least-32-chars"),
+  ADMIN_EMAILS: z
+    .preprocess(
+      (val) =>
+        typeof val === "string" && val.trim() !== ""
+          ? val.trim()
+          : "admin@example.com",
+      z.string()
+    )
+    .default("admin@example.com"),
+  ADMIN_PASSWORD: z
+    .preprocess(
+      (val) =>
+        typeof val === "string" && val.trim() !== "" ? val.trim() : "admin123",
+      z.string().min(1)
+    )
+    .default("admin123"),
+  ADMIN_NOTIFY_EMAIL: optionalString,
 
   // Google Drive Photo Storage
   GOOGLE_OAUTH_CLIENT_ID: optionalString,
@@ -33,74 +64,87 @@ export const envSchema = z.object({
 
   // Email (Resend)
   RESEND_API_KEY: optionalString,
-  MAIL_FROM: optionalString.default("Custom Magazine <noreply@cleanplay.app>"),
-
-  // WhatsApp
-  WHATSAPP_NUMBER: optionalString.default("254700000000"),
-  WHATSAPP_CLOUD_ENABLED: z
-    .preprocess((val) => {
-      if (typeof val === "boolean") return val;
-      if (typeof val === "string") return val.toLowerCase() === "true";
-      return false;
-    }, z.boolean())
-    .default(false),
-  WHATSAPP_PHONE_NUMBER_ID: optionalString,
-  WHATSAPP_ACCESS_TOKEN: optionalString,
-  WHATSAPP_TEMPLATE_NAME: optionalString.default("order_status_update"),
-
-  // Telegram Notifier
-  TELEGRAM_BOT_TOKEN: optionalString,
-  TELEGRAM_CHAT_ID: optionalString,
-
-  // Cloudflare Turnstile
-  TURNSTILE_SITE_KEY: optionalString,
-  TURNSTILE_SECRET_KEY: optionalString,
+  MAIL_FROM: z
+    .preprocess(
+      (val) =>
+        typeof val === "string" && val.trim() !== ""
+          ? val.trim()
+          : "Custom Magazine <noreply@cleanplay.app>",
+      z.string()
+    )
+    .default("Custom Magazine <noreply@cleanplay.app>"),
 });
 
-export type EnvConfig = z.infer<typeof envSchema>;
+export type Env = z.infer<typeof envSchema> & {
+  NEXT_PUBLIC_APP_URL: string;
+};
 
-export function parseEnv(rawEnv: Record<string, string | undefined> = process.env): EnvConfig {
+export function parseEnv(
+  rawEnv: Record<string, string | undefined> = process.env
+): Env {
   const parsed = envSchema.safeParse(rawEnv);
-
   if (!parsed.success) {
-    const formatted = parsed.error.issues
-      .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
-      .join("\n");
-    throw new Error(`Invalid environment configuration:\n${formatted}`);
+    console.error(
+      "Invalid environment variables:",
+      parsed.error.flatten().fieldErrors
+    );
+    throw new Error("Invalid environment configuration.");
   }
 
-  return parsed.data;
+  const resolvedAppUrl = (
+    parsed.data.NEXT_APP_URL ||
+    parsed.data.NEXT_PUBLIC_APP_URL ||
+    (rawEnv.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${rawEnv.VERCEL_PROJECT_PRODUCTION_URL}`
+      : rawEnv.VERCEL_URL
+        ? `https://${rawEnv.VERCEL_URL}`
+        : "http://localhost:3000")
+  ).replace(/\/+$/, "");
+
+  return {
+    ...parsed.data,
+    NEXT_APP_URL: resolvedAppUrl,
+    NEXT_PUBLIC_APP_URL: resolvedAppUrl,
+  };
 }
 
 export const env = parseEnv(process.env);
 
-export function getAdminAllowlist(currentEnv: EnvConfig = env): string[] {
+/**
+ * Returns parsed list of allowed admin emails in lowercase.
+ */
+export function getAdminAllowlist(currentEnv: Env = env): string[] {
   return currentEnv.ADMIN_EMAILS.split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 }
 
 /**
- * Primary admin recipient for order completions and critical system alerts.
+ * Returns the primary admin email for critical alerts and order completion primary recipient.
+ * Defaults to ADMIN_NOTIFY_EMAIL (e.g., princemumo80@gmail.com) or the first email in ADMIN_EMAILS.
  */
-export function getPrimaryAdminEmail(currentEnv: EnvConfig = env): string {
-  const explicit = currentEnv.ADMIN_NOTIFY_EMAIL?.trim().toLowerCase();
-  if (explicit) return explicit;
+export function getPrimaryAdminEmail(currentEnv: Env = env): string | null {
+  if (currentEnv.ADMIN_NOTIFY_EMAIL) {
+    return currentEnv.ADMIN_NOTIFY_EMAIL.trim().toLowerCase();
+  }
   const allowlist = getAdminAllowlist(currentEnv);
-  return allowlist[0] || "princemumo80@gmail.com";
+  return allowlist[0] ?? null;
 }
 
 /**
- * Additional admin emails from ADMIN_EMAILS to CC on order completion notifications
- * (excludes the primary recipient so they are not listed in both To and CC).
+ * Returns all additional admin emails from ADMIN_EMAILS (excluding the primary admin email)
+ * so order completion emails automatically CC all other configured admins.
  */
-export function getCompletionCcEmails(currentEnv: EnvConfig = env): string[] {
+export function getCompletionCcEmails(currentEnv: Env = env): string[] {
   const primary = getPrimaryAdminEmail(currentEnv);
   return getAdminAllowlist(currentEnv).filter((email) => email !== primary);
 }
 
-export function getServiceModeSummary(currentEnv: EnvConfig = env) {
-  const isDatabaseRemote = Boolean(
+/**
+ * Inspects which adapters are running in Live mode vs Local/Mock mode.
+ */
+export function getServiceModeSummary(currentEnv: Env = env) {
+  const isDatabasePostgres = Boolean(
     currentEnv.DATABASE_URL &&
       (currentEnv.DATABASE_URL.startsWith("postgres://") ||
         currentEnv.DATABASE_URL.startsWith("postgresql://"))
@@ -113,59 +157,29 @@ export function getServiceModeSummary(currentEnv: EnvConfig = env) {
       currentEnv.DRIVE_ROOT_FOLDER_ID
   );
 
-  const isMailerLive = Boolean(currentEnv.RESEND_API_KEY && currentEnv.MAIL_FROM);
+  const isResendLive = Boolean(currentEnv.RESEND_API_KEY);
 
-  const isWhatsAppCloudLive = Boolean(
-    currentEnv.WHATSAPP_CLOUD_ENABLED &&
-      currentEnv.WHATSAPP_PHONE_NUMBER_ID &&
-      currentEnv.WHATSAPP_ACCESS_TOKEN &&
-      currentEnv.WHATSAPP_TEMPLATE_NAME
-  );
-
-  const isTelegramLive = Boolean(
-    currentEnv.TELEGRAM_BOT_TOKEN && currentEnv.TELEGRAM_CHAT_ID
-  );
-
-  const isGoogleAuthLive = Boolean(
-    currentEnv.AUTH_GOOGLE_ID && currentEnv.AUTH_GOOGLE_SECRET
-  );
-
-  const isAdminPasswordConfigured = Boolean(
+  const isAdminPasswordCustom = Boolean(
     currentEnv.ADMIN_PASSWORD && currentEnv.ADMIN_PASSWORD !== "admin123"
   );
 
-  const isTurnstileLive = Boolean(
-    currentEnv.TURNSTILE_SITE_KEY && currentEnv.TURNSTILE_SECRET_KEY
-  );
-
-  const isNeonFunctionLive = Boolean(currentEnv.NEON_FUNCTION_HELLO_BASE_URL);
-
-  const isDevMode =
-    currentEnv.NODE_ENV !== "production" &&
-    (!isDriveLive || !isMailerLive || !isDatabaseRemote);
+  const isDevMode = !isDatabasePostgres && !isDriveLive && !isResendLive;
 
   return {
     isDevMode,
-    database: isDatabaseRemote ? ("postgres" as const) : ("pglite_local" as const),
-    neonBranch: currentEnv.NEON_BRANCH ?? null,
-    neonFunctionUrl: currentEnv.NEON_FUNCTION_HELLO_BASE_URL ?? null,
-    neonFunctions: isNeonFunctionLive ? ("live" as const) : ("unconfigured" as const),
+    appUrl: currentEnv.NEXT_PUBLIC_APP_URL,
+    database: isDatabasePostgres
+      ? ("postgres" as const)
+      : ("pglite_local" as const),
+    neonBranch: currentEnv.NEON_BRANCH ?? (isDatabasePostgres ? "main" : null),
     photoStorage: isDriveLive ? ("drive" as const) : ("local" as const),
-    mailer: isMailerLive ? ("resend" as const) : ("console" as const),
-    whatsapp: isWhatsAppCloudLive
-      ? ("cloud" as const)
-      : currentEnv.WHATSAPP_NUMBER
-        ? ("link" as const)
-        : ("console" as const),
+    mailer: isResendLive ? ("resend" as const) : ("console" as const),
     notifier: {
-      email: Boolean(currentEnv.ADMIN_NOTIFY_EMAIL && isMailerLive),
-      telegram: isTelegramLive,
-      console: !currentEnv.ADMIN_NOTIFY_EMAIL && !isTelegramLive,
+      email: Boolean(getPrimaryAdminEmail(currentEnv)),
+      console: !getPrimaryAdminEmail(currentEnv),
     },
-    adminAuth: isAdminPasswordConfigured
+    adminAuth: isAdminPasswordCustom
       ? ("password" as const)
       : ("default_password" as const),
-    googleAuth: isGoogleAuthLive ? ("google" as const) : ("dev_bypass" as const),
-    turnstile: isTurnstileLive ? ("enabled" as const) : ("disabled" as const),
   };
 }

@@ -13,7 +13,6 @@ import {
 import { signPhotoPreviewToken, sanitizeText } from "@/lib/security";
 import { getPhotoStorage } from "@/lib/services/photo-storage";
 import { getMailer } from "@/lib/services/mailer";
-import { getWhatsAppProvider } from "@/lib/services/whatsapp";
 import { getAdminNotifier } from "@/lib/services/admin-notifier";
 import { renderCustomerConfirmationEmail } from "@/emails/templates";
 import { env } from "@/env";
@@ -56,7 +55,6 @@ export interface HydratedDraftOrder {
   status: string;
   values: Record<string, unknown>;
   photos: UploadedPhotoItem[];
-  whatsAppUrl: string;
 }
 
 /**
@@ -120,12 +118,6 @@ export async function getDraftByToken(
 
   values["photos"] = photoItems;
 
-  const wa = getWhatsAppProvider();
-  const whatsAppUrl = wa.buildCustomerWaLink(
-    order.reference,
-    order.herName ?? undefined
-  );
-
   return {
     orderId: order.id,
     reference: order.reference,
@@ -133,7 +125,6 @@ export async function getDraftByToken(
     status: order.status,
     values,
     photos: photoItems,
-    whatsAppUrl,
   };
 }
 
@@ -286,7 +277,6 @@ export async function submitOrder(
   alreadySubmitted: boolean;
   reference: string;
   herName: string;
-  whatsAppUrl: string;
 }> {
   await ensureDbReady();
 
@@ -298,18 +288,12 @@ export async function submitOrder(
     throw new NotFoundError("Order draft");
   }
 
-  const wa = getWhatsAppProvider();
-
   // Idempotency: if already submitted, return immediately without re-sending emails
   if (existingOrder.status !== "draft") {
     return {
       alreadySubmitted: true,
       reference: existingOrder.reference,
       herName: existingOrder.herName ?? "her",
-      whatsAppUrl: wa.buildCustomerWaLink(
-        existingOrder.reference,
-        existingOrder.herName ?? undefined
-      ),
     };
   }
 
@@ -410,8 +394,6 @@ export async function submitOrder(
     adminEmail: "customer_submission",
   });
 
-  const whatsAppUrl = wa.buildCustomerWaLink(existingOrder.reference, herName);
-
   // Send customer confirmation email
   const mailer = getMailer();
   const confirmationMail = renderCustomerConfirmationEmail({
@@ -420,7 +402,6 @@ export async function submitOrder(
     orderReference: existingOrder.reference,
     colourTheme,
     photoCount: hydrated.photos.length,
-    whatsAppUrl,
   });
 
   await mailer.sendMail({
@@ -451,6 +432,5 @@ export async function submitOrder(
     alreadySubmitted: false,
     reference: existingOrder.reference,
     herName,
-    whatsAppUrl,
   };
 }
