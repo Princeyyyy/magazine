@@ -1,7 +1,12 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { ensureDbReady, db } from "@/db";
 import { orders } from "@/db/schema";
-import { createOrLoadDraft, saveDraftAnswers, getDraftByToken } from "@/lib/orders";
+import {
+  createOrLoadDraft,
+  saveDraftAnswers,
+  getDraftByToken,
+  hasMeaningfulValues,
+} from "@/lib/orders";
 import { eq } from "drizzle-orm";
 
 describe("Lazy Order Creation & Phantom Record Prevention", () => {
@@ -29,6 +34,30 @@ describe("Lazy Order Creation & Phantom Record Prevention", () => {
     const countBefore = (await db.select().from(orders)).length;
 
     const result = await saveDraftAnswers(undefined, {});
+    expect(result.created).toBe(false);
+    expect(result.draftToken).toBe("");
+
+    const countAfter = (await db.select().from(orders)).length;
+    expect(countAfter).toBe(countBefore);
+  });
+
+  it("does not create an order in DB when only consent checkbox or defaults are checked", async () => {
+    await ensureDbReady();
+    const countBefore = (await db.select().from(orders)).length;
+
+    expect(
+      hasMeaningfulValues({
+        subject_gender: "Female",
+        permission_consent: true,
+        customer_name: "",
+        her_name: "",
+      })
+    ).toBe(false);
+
+    const result = await saveDraftAnswers(undefined, {
+      subject_gender: "Female",
+      permission_consent: true,
+    });
     expect(result.created).toBe(false);
     expect(result.draftToken).toBe("");
 

@@ -108,11 +108,12 @@ function hasAnySavedProgress(
   for (const page of FORM_PAGES) {
     for (const group of page.groups) {
       for (const field of group.fields) {
-        if (field.key === "subject_gender") continue;
+        if (field.key === "subject_gender" || field.key === "permission_consent") {
+          continue;
+        }
         const v = vals[field.key];
         if (typeof v === "string" && v.trim().length > 0) return true;
-        if (typeof v === "number") return true;
-        if (v === true) return true;
+        if (typeof v === "number" && !Number.isNaN(v) && v > 0) return true;
         if (Array.isArray(v) && v.length > 0) {
           const anyRowFilled = v.some(
             (row) =>
@@ -234,6 +235,24 @@ export function MagazineWizard({
 
     async function initDraft() {
       try {
+        // If viewing in Admin Mode without an explicit resume URL parameter,
+        // guarantee clean slate for inspecting the customer form (do not restore or create drafts)
+        if (initialIsAdmin && !resumeTokenParam) {
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+          }
+          if (!welcomedRef.current) {
+            welcomedRef.current = true;
+            showEditorialToast(
+              "Admin Inspection Mode",
+              "You can freely navigate all 9 chapters & final review. No test data or orders will be logged.",
+              "default",
+              4500
+            );
+          }
+          return;
+        }
+
         const storedToken =
           resumeTokenParam ||
           (typeof window !== "undefined"
@@ -315,6 +334,24 @@ export function MagazineWizard({
           data.draft.values,
           data.draft.photos
         );
+
+        // If the draft has zero saved answers (e.g. empty phantom from earlier), discard it
+        if (!hasSavedAnswers && !resumeTokenParam) {
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+          }
+          if (!welcomedRef.current) {
+            welcomedRef.current = true;
+            showEditorialToast(
+              "Welcome to Custom Magazine",
+              "Craft a bespoke editorial keepsake. Your answers and photos save automatically as you go.",
+              "default",
+              5000
+            );
+          }
+          return;
+        }
+
         const isReturningSession =
           Boolean(resumeTokenParam) || (Boolean(storedToken) && hasSavedAnswers);
 
@@ -376,12 +413,15 @@ export function MagazineWizard({
     return () => {
       active = false;
     };
-  }, [resumeTokenParam, showEditorialToast]);
+  }, [initialIsAdmin, resumeTokenParam, showEditorialToast]);
 
   // Save draft helper: lazily creates draft on first meaningful edit, then updates
   const persistDraftNow = useCallback(
     async (overrideValues?: Record<string, unknown>) => {
       if (orderStatus !== "draft") return;
+      // Admins inspecting the customer form should NEVER create drafts or log orders in DB
+      if (isAdmin && !draftTokenRef.current) return;
+
       const payloadValues = overrideValues ?? valuesRef.current;
 
       // Do not ping server or create phantom records if still blank and has no token
@@ -427,7 +467,7 @@ export function MagazineWizard({
         setSaveState("idle");
       }
     },
-    [honeypot, orderStatus, photos]
+    [honeypot, isAdmin, orderStatus, photos]
   );
 
   const triggerDebouncedSave = useCallback(() => {
@@ -620,21 +660,30 @@ export function MagazineWizard({
       );
       return;
     }
-    void persistDraftNow();
+    if (hasAnySavedProgress(valuesRef.current, photos)) {
+      void persistDraftNow();
+    }
     const nextIdx = Math.min(FORM_PAGES.length, currentStep + 1);
     setHighestUnlockedStep((prev) => Math.max(prev, nextIdx));
     setCurrentStep(nextIdx);
     const completedNumber = currentStep + 1;
     const nextPage = FORM_PAGES[nextIdx];
     if (nextPage) {
-      showEditorialToast(
-        `Chapter ${completedNumber} saved`,
-        `Up next: ${adaptCopyByGender(nextPage.title, selectedGender)}`
-      );
+      if (hasAnySavedProgress(valuesRef.current, photos)) {
+        showEditorialToast(
+          `Chapter ${completedNumber} saved`,
+          `Up next: ${adaptCopyByGender(nextPage.title, selectedGender)}`
+        );
+      } else {
+        showEditorialToast(
+          `Chapter ${nextIdx + 1}: ${adaptCopyByGender(nextPage.title, selectedGender)}`,
+          isAdmin ? "Viewing in Admin Inspection Mode" : "Step forward"
+        );
+      }
     } else {
       showEditorialToast(
-        "All 9 chapters complete",
-        "Take a moment to review your Final Proof before submitting."
+        "Final Editorial Proof",
+        "Take a moment to review the magazine brief layout."
       );
     }
     if (typeof window !== "undefined") {
@@ -643,7 +692,9 @@ export function MagazineWizard({
   };
 
   const handleBackPage = async () => {
-    void persistDraftNow();
+    if (hasAnySavedProgress(valuesRef.current, photos)) {
+      void persistDraftNow();
+    }
     setFieldErrors({});
     setRowErrors({});
     setCurrentStep((prev) => Math.max(0, prev - 1));
@@ -655,7 +706,9 @@ export function MagazineWizard({
   const handleJumpToStep = (targetIdx: number) => {
     const canJump = isDevMode || isAdmin || targetIdx <= highestUnlockedStep;
     if (!canJump) return;
-    void persistDraftNow();
+    if (hasAnySavedProgress(valuesRef.current, photos)) {
+      void persistDraftNow();
+    }
     setFieldErrors({});
     setRowErrors({});
     setCurrentStep(targetIdx);

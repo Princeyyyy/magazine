@@ -26,13 +26,13 @@ export function hasMeaningfulValues(values: Record<string, unknown>): boolean {
       key === "subject_gender" ||
       key === "photos" ||
       key === "honeypot" ||
-      key === "token"
+      key === "token" ||
+      key === "permission_consent"
     ) {
       continue;
     }
     if (typeof val === "string" && val.trim().length > 0) return true;
-    if (typeof val === "number" && !Number.isNaN(val)) return true;
-    if (val === true) return true;
+    if (typeof val === "number" && !Number.isNaN(val) && val > 0) return true;
     if (Array.isArray(val) && val.length > 0) {
       const anyRow = val.some(
         (row) =>
@@ -214,6 +214,26 @@ export async function saveDraftAnswers(
         where: eq(orders.draftToken, cleanToken),
       })
     : null;
+
+  // Self-heal: If an empty ghost draft was stored and values are still blank, prune it
+  if (
+    order &&
+    order.status === "draft" &&
+    !order.customerName?.trim() &&
+    !order.herName?.trim() &&
+    !order.email?.trim() &&
+    !hasMeaningfulValues(partialValues)
+  ) {
+    await db.delete(orders).where(eq(orders.id, order.id));
+    return {
+      orderId: "",
+      reference: "",
+      draftToken: "",
+      updatedAt: new Date().toISOString(),
+      status: "draft",
+      created: false,
+    };
+  }
 
   let createdNew = false;
 
