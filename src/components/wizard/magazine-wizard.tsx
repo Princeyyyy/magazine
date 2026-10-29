@@ -623,8 +623,11 @@ export function MagazineWizard() {
         "Magazine brief submitted",
         `Order ${data.reference} has been received.`
       );
+      const herParam = String(values["her_name"] || "").trim();
       router.push(
-        `/thank-you?ref=${encodeURIComponent(data.reference)}`
+        `/thank-you?ref=${encodeURIComponent(data.reference)}${
+          herParam ? `&her=${encodeURIComponent(herParam)}` : ""
+        }`
       );
     } catch {
       const errMsg =

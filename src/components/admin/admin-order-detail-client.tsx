@@ -633,16 +633,16 @@ export function AdminOrderDetailClient({
             <Textarea
               value={emailMessage}
               onChange={(e) => setEmailMessage(e.target.value)}
-              placeholder="Write a message to the customer (or leave blank to re-send the order confirmation email)..."
+              placeholder="Write a message to send to the customer..."
               className="bg-white min-h-[90px]"
             />
             <div className="flex justify-end gap-2">
-              <Button type="submit" size="sm" disabled={isSendingEmail}>
-                {isSendingEmail
-                  ? "Sending..."
-                  : emailMessage.trim()
-                    ? "Send Message"
-                    : "Resend Confirmation Email"}
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSendingEmail || !emailMessage.trim()}
+              >
+                {isSendingEmail ? "Sending..." : "Send Email"}
               </Button>
             </div>
           </form>
@@ -740,8 +740,13 @@ export function AdminOrderDetailClient({
                       )}
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-[#EAE0DA] bg-[#FCF9F7] p-5 text-xs text-[#7A686E] italic">
-                      No photographs have been uploaded for this order yet. Once the customer uploads their photos, their dedicated Google Drive folder link and photo captions will appear here automatically.
+                    <div className="rounded-2xl border border-[#EAE0DA] bg-[#FCF9F7] p-6 text-center space-y-2">
+                      <p className="font-serif text-base text-[#1F1619]">
+                        Awaiting Customer Photographs
+                      </p>
+                      <p className="text-xs text-[#7A686E] max-w-md mx-auto leading-relaxed">
+                        No photographs have been uploaded for this order yet. Once the customer uploads their photos, their dedicated Google Drive folder link and photo captions will appear here automatically.
+                      </p>
                     </div>
                   )}
 
@@ -987,9 +992,14 @@ export function AdminOrderDetailClient({
               Order Files &amp; Exports
             </h2>
             {!hasBriefContent ? (
-              <p className="text-xs italic text-[#8C7A80] leading-relaxed">
-                This draft does not have any completed answers or uploaded photos yet. Exports will become available as soon as the customer starts filling in their questionnaire.
-              </p>
+              <div className="rounded-2xl border border-[#F3ECE7] bg-[#FCF9F7] p-5 text-center space-y-1.5">
+                <p className="font-serif text-base text-[#1F1619]">
+                  Exports Ready Once Brief Begins
+                </p>
+                <p className="text-xs text-[#8C7A80] leading-relaxed">
+                  Word and PDF editorial exports will unlock automatically as soon as the customer starts filling in their questionnaire.
+                </p>
+              </div>
             ) : (
               <>
                 <p className="text-xs text-[#6E5A61] leading-relaxed">
@@ -1056,9 +1066,14 @@ export function AdminOrderDetailClient({
               Status Workflow Log
             </h2>
             {statusHistory.length === 0 ? (
-              <p className="text-xs italic text-[#96838A]">
-                No status transitions recorded yet.
-              </p>
+              <div className="rounded-2xl border border-[#F3ECE7] bg-[#FCF9F7] p-5 text-center space-y-1.5">
+                <p className="font-serif text-base text-[#1F1619]">
+                  Initial Draft Stage
+                </p>
+                <p className="text-xs text-[#8C7A80] leading-relaxed">
+                  Status transitions will be logged here as this issue moves from Draft through Design and Delivery.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2.5">
                 {statusHistory.map((sh) => (

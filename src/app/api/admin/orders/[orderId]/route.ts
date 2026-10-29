@@ -4,7 +4,6 @@ import { db, ensureDbReady } from "@/db";
 import { orders, statusHistory, orderStatusEnum, type OrderStatus } from "@/db/schema";
 import { getAuthenticatedAdminEmail } from "@/auth";
 import { getMailer } from "@/lib/services/mailer";
-import { renderCustomerConfirmationEmail } from "@/emails/templates";
 import { handleApiError } from "@/lib/api-response";
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 
@@ -62,51 +61,50 @@ export async function PATCH(
       if (!order.email) {
         throw new ValidationError("Customer email is not set on this order.");
       }
-      const mailer = getMailer();
-
-      if (body.emailMessage && body.emailMessage.trim()) {
-        const subject =
-          body.emailSubject?.trim() ||
-          `Update on ${order.herName || "your"} custom magazine (${order.reference})`;
-        const text = body.emailMessage.trim();
-        const html = `<div style="font-family:Georgia,serif;color:#1F1619;max-width:580px;margin:20px auto;padding:32px;border:1px solid #EFE6E0;background:#FFFFFF;">
-          <p style="text-transform:uppercase;letter-spacing:2px;font-size:11px;color:#9E4765;font-family:sans-serif;">CUSTOM MAGAZINE</p>
-          <p style="font-size:15px;line-height:1.7;white-space:pre-wrap;">${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
-          <hr style="border:none;border-top:1px solid #EFE6E0;margin:24px 0;" />
-          <p style="font-size:12px;color:#7A686E;font-family:sans-serif;">Order Reference: ${order.reference}</p>
-        </div>`;
-
-        const sendRes = await mailer.sendMail({
-          orderId: order.id,
-          to: order.email,
-          subject,
-          html,
-          text,
-          template: "admin_custom_email",
-        });
-
-        return NextResponse.json({ ok: sendRes.ok, error: sendRes.error });
-      } else {
-        // Resend order confirmation email
-        const tpl = renderCustomerConfirmationEmail({
-          customerName: order.customerName || "Customer",
-          herName: order.herName || "Featured Star",
-          orderReference: order.reference,
-          colourTheme: order.colourTheme || "Editorial",
-          photoCount: 15,
-        });
-
-        const sendRes = await mailer.sendMail({
-          orderId: order.id,
-          to: order.email,
-          subject: tpl.subject,
-          html: tpl.html,
-          text: tpl.text,
-          template: "customer_order_confirmation_resend",
-        });
-
-        return NextResponse.json({ ok: sendRes.ok, error: sendRes.error });
+      if (!body.emailMessage || !body.emailMessage.trim()) {
+        throw new ValidationError("Please write a message to send to the customer.");
       }
+
+      const mailer = getMailer();
+      const subject =
+        body.emailSubject?.trim() ||
+        `Update on ${order.herName || "your"} Custom Magazine (${order.reference})`;
+      const text = body.emailMessage.trim();
+      const safeBody = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>${subject}</title></head>
+<body style="margin:0;padding:36px 16px;background-color:#FAF6F3;font-family:Georgia,'Times New Roman',serif;color:#1F1619;">
+  <div style="max-width:580px;margin:0 auto;background:#FFFFFF;border:1px solid #E8DDD5;border-radius:20px;overflow:hidden;">
+    <div style="height:5px;background-color:#9E4765;"></div>
+    <div style="padding:36px 40px;">
+      <p style="margin:0 0 18px 0;font-family:sans-serif;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#9E4765;">
+        CUSTOM MAGAZINE
+      </p>
+      <p style="margin:0 0 24px 0;font-size:15px;line-height:1.75;white-space:pre-wrap;color:#2D2024;">${safeBody}</p>
+      <hr style="border:none;border-top:1px solid #F2EAE4;margin:24px 0 16px 0;" />
+      <p style="margin:0;font-family:sans-serif;font-size:12px;color:#7A686E;">
+        Order Reference: <strong style="color:#1F1619;">${order.reference}</strong>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const sendRes = await mailer.sendMail({
+        orderId: order.id,
+        to: order.email,
+        subject,
+        html,
+        text,
+        template: "admin_custom_email",
+      });
+
+      return NextResponse.json({ ok: sendRes.ok, error: sendRes.error });
     }
 
     throw new ForbiddenError("Unsupported admin action.");

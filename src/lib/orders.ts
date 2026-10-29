@@ -12,9 +12,7 @@ import {
 } from "@/config/form";
 import { signPhotoPreviewToken, sanitizeText } from "@/lib/security";
 import { getPhotoStorage } from "@/lib/services/photo-storage";
-import { getMailer } from "@/lib/services/mailer";
 import { getAdminNotifier } from "@/lib/services/admin-notifier";
-import { renderCustomerConfirmationEmail } from "@/emails/templates";
 import { env } from "@/env";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 
@@ -392,25 +390,6 @@ export async function submitOrder(
     fromStatus: "draft",
     toStatus: "submitted",
     adminEmail: "customer_submission",
-  });
-
-  // Send customer confirmation email
-  const mailer = getMailer();
-  const confirmationMail = renderCustomerConfirmationEmail({
-    customerName,
-    herName,
-    orderReference: existingOrder.reference,
-    colourTheme,
-    photoCount: hydrated.photos.length,
-  });
-
-  await mailer.sendMail({
-    orderId: existingOrder.id,
-    to: email,
-    subject: confirmationMail.subject,
-    html: confirmationMail.html,
-    text: confirmationMail.text,
-    template: "customer_order_confirmation",
   });
 
   // Notify admin via AdminNotifier (email to princemumo80@gmail.com + CC other ADMIN_EMAILS)

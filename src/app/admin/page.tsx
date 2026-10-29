@@ -16,6 +16,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
+  RotateCcw,
 } from "lucide-react";
 
 const PAGE_SIZE = 10;
@@ -82,6 +84,7 @@ export default async function AdminOrdersPage({
   const themeFilter = (params.theme ?? "").trim().toLowerCase();
   const sortOrder = params.sort === "oldest" ? "oldest" : "newest";
   const requestedPage = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const hasActiveFilters = Boolean(query || statusFilter || themeFilter);
 
   const allOrders = await db
     .select()
@@ -150,7 +153,7 @@ export default async function AdminOrdersPage({
         </div>
 
         <Button asChild variant="outline" size="sm">
-          <Link href="/admin/settings">Configure Services &amp; Dev Outbox</Link>
+          <Link href="/admin/settings">Configure Services</Link>
         </Button>
       </div>
 
@@ -227,209 +230,242 @@ export default async function AdminOrdersPage({
 
       {/* Orders Table */}
       <div className="rounded-3xl border border-[#EFE6E0] bg-white overflow-hidden shadow-[0_8px_30px_-12px_rgba(31,22,25,0.05)]">
-        {totalCount === 0 ? (
-          <div className="p-14 text-center space-y-2">
-            <p className="font-serif text-xl text-[#1F1619]">
-              No matching magazine orders found
-            </p>
-            <p className="text-xs text-[#7A686E]">
-              Try clearing your filters or run <code className="font-mono bg-[#FAF3F0] px-1.5 py-0.5">npm run db:seed</code> to populate sample issues.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-[#EFE6E0] bg-[#FCF9F7] text-[11px] uppercase tracking-wider text-[#7A686E]">
-                    <th className="py-3.5 px-5 font-medium">Reference</th>
-                    <th className="py-3.5 px-5 font-medium">Featured Star</th>
-                    <th className="py-3.5 px-5 font-medium">Ordered By</th>
-                    <th className="py-3.5 px-5 font-medium">Colour Theme</th>
-                    <th className="py-3.5 px-5 font-medium">Photos</th>
-                    <th className="py-3.5 px-5 font-medium">Status</th>
-                    <th className="py-3.5 px-5 font-medium">Last Updated</th>
-                    <th className="py-3.5 px-5 text-right font-medium">Brief</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F3ECE7] text-sm">
-                  {paginatedOrders.map((order) => {
-                    const photoCount = photoCountMap.get(order.id) ?? 0;
-                    const statusMeta = STATUS_BADGE_MAP[order.status];
-
-                    return (
-                      <tr
-                        key={order.id}
-                        className="hover:bg-[#FCF9F7]/80 transition-colors"
-                      >
-                        <td className="py-4 px-5 font-mono text-xs font-medium text-[#1F1619]">
-                          <Link
-                            href={`/admin/orders/${order.id}`}
-                            className="hover:text-[#9E4765] underline-offset-4 hover:underline"
-                          >
-                            {order.reference}
-                          </Link>
-                        </td>
-                        <td className="py-4 px-5">
-                          <div className="font-serif text-base font-medium text-[#1F1619]">
-                            {order.herName || (
-                              <span className="italic text-[#A39197]">
-                                Untitled Star
-                              </span>
-                            )}
-                          </div>
-                          {order.ageTurning && (
-                            <div className="text-xs text-[#7A686E]">
-                              Turning {order.ageTurning}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-5">
-                          <div className="text-sm text-[#1F1619]">
-                            {order.customerName || "—"}
-                          </div>
-                          <div className="text-xs text-[#7A686E]">
-                            {order.email || order.relationship || ""}
-                          </div>
-                        </td>
-                        <td className="py-4 px-5 text-xs text-[#4A3A40]">
-                          {order.colourTheme || "—"}
-                        </td>
-                        <td className="py-4 px-5">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 text-xs text-[#4A3A40]">
-                              <Camera className="h-3.5 w-3.5 text-[#9E4765]" />
-                              {photoCount}
-                            </span>
-                            {(order.driveFolderUrl || order.driveFolderId) && (
-                              <a
-                                href={
-                                  order.driveFolderUrl ||
-                                  `https://drive.google.com/drive/folders/${order.driveFolderId}`
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Open order photo folder in Google Drive"
-                                className="inline-flex items-center gap-1 rounded-full border border-[#EAD4DF] bg-[#FDF8FA] px-2 py-0.5 text-[10px] font-medium text-[#9E4765] hover:bg-[#F6EBF0] transition-colors"
-                              >
-                                Drive
-                                <ExternalLink className="h-2.5 w-2.5" />
-                              </a>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-5">
-                          <Badge
-                            variant={statusMeta.variant}
-                            className="rounded-full"
-                          >
-                            {statusMeta.label}
-                          </Badge>
-                        </td>
-                        <td className="py-4 px-5 text-xs text-[#4A3A40]">
-                          <div className="font-medium text-[#1F1619]">
-                            {new Date(order.updatedAt).toLocaleDateString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </div>
-                          <div className="text-[11px] text-[#8C7A80]">
-                            {new Date(order.updatedAt).toLocaleTimeString("en-GB", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </div>
-                        </td>
-                        <td className="py-4 px-5 text-right">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-[#EFE6E0] bg-[#FCF9F7] text-[11px] uppercase tracking-wider text-[#7A686E]">
+                <th className="py-3.5 px-5 font-medium">Reference</th>
+                <th className="py-3.5 px-5 font-medium">Featured Star</th>
+                <th className="py-3.5 px-5 font-medium">Ordered By</th>
+                <th className="py-3.5 px-5 font-medium">Colour Theme</th>
+                <th className="py-3.5 px-5 font-medium">Photos</th>
+                <th className="py-3.5 px-5 font-medium">Status</th>
+                <th className="py-3.5 px-5 font-medium">Last Updated</th>
+                <th className="py-3.5 px-5 text-right font-medium">Brief</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#F3ECE7] text-sm">
+              {totalCount === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-20 text-center">
+                    <div className="mx-auto max-w-md space-y-4">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#EAD4DF] bg-[#FDF8FA] text-[#9E4765] shadow-2xs">
+                        <BookOpen className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#9E4765]">
+                          {hasActiveFilters ? "Filtered View" : "Editorial Archive"}
+                        </p>
+                        <h2 className="font-serif text-2xl text-[#1F1619]">
+                          {hasActiveFilters
+                            ? "No matching magazine issues"
+                            : "Your Editorial Desk is ready"}
+                        </h2>
+                        <p className="text-xs text-[#7A686E] leading-relaxed">
+                          {hasActiveFilters
+                            ? "No orders matched your current search or filter selection. Reset your filters below to view the full editorial queue."
+                            : "No customer magazine briefs have been started or submitted yet. As soon as a customer begins filling in their questionnaire, their issue, uploaded photographs, and status workflow will appear here automatically."}
+                        </p>
+                      </div>
+                      <div className="pt-2 flex items-center justify-center gap-3">
+                        {hasActiveFilters ? (
                           <Button asChild variant="outline" size="sm">
-                            <Link href={`/admin/orders/${order.id}`}>
-                              Open Brief
+                            <Link href="/admin">
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Reset Filters
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href="/" target="_blank">
+                              Open Customer Questionnaire
                               <ArrowUpRight className="h-3.5 w-3.5" />
                             </Link>
                           </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedOrders.map((order) => {
+                  const photoCount = photoCountMap.get(order.id) ?? 0;
+                  const statusMeta = STATUS_BADGE_MAP[order.status];
 
-            {/* Elegant Editorial Pagination Bar (10 per page) */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[#EFE6E0] bg-[#FCF9F7] px-6 py-4">
-              <p className="text-xs text-[#6E5A61]">
-                Showing{" "}
-                <strong className="font-medium text-[#1F1619]">
-                  {startIndex + 1}&ndash;
-                  {Math.min(startIndex + PAGE_SIZE, totalCount)}
-                </strong>{" "}
-                of{" "}
-                <strong className="font-medium text-[#1F1619]">
-                  {totalCount}
-                </strong>{" "}
-                {totalCount === 1 ? "magazine issue" : "magazine issues"} (10 per
-                page)
-              </p>
-
-              <nav
-                aria-label="Orders pagination"
-                className="flex items-center gap-1.5"
-              >
-                {currentPage > 1 ? (
-                  <Link
-                    href={buildPageUrl(params, currentPage - 1)}
-                    className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                    Previous
-                  </Link>
-                ) : (
-                  <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                    Previous
-                  </span>
-                )}
-
-                <div className="flex items-center gap-1 px-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (pNum) => {
-                      const isActive = pNum === currentPage;
-                      return (
+                  return (
+                    <tr
+                      key={order.id}
+                      className="hover:bg-[#FCF9F7]/80 transition-colors"
+                    >
+                      <td className="py-4 px-5 font-mono text-xs font-medium text-[#1F1619]">
                         <Link
-                          key={pNum}
-                          href={buildPageUrl(params, pNum)}
-                          aria-current={isActive ? "page" : undefined}
-                          className={
-                            isActive
-                              ? "inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#9E4765] text-xs font-semibold text-white shadow-2xs"
-                              : "inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#EAE0DA] bg-white text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-                          }
+                          href={`/admin/orders/${order.id}`}
+                          className="hover:text-[#9E4765] underline-offset-4 hover:underline"
                         >
-                          {pNum}
+                          {order.reference}
                         </Link>
-                      );
-                    }
-                  )}
-                </div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="font-serif text-base font-medium text-[#1F1619]">
+                          {order.herName || (
+                            <span className="italic text-[#A39197]">
+                              Untitled Star
+                            </span>
+                          )}
+                        </div>
+                        {order.ageTurning && (
+                          <div className="text-xs text-[#7A686E]">
+                            Turning {order.ageTurning}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="text-sm text-[#1F1619]">
+                          {order.customerName || "—"}
+                        </div>
+                        <div className="text-xs text-[#7A686E]">
+                          {order.email || order.relationship || ""}
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 text-xs text-[#4A3A40]">
+                        {order.colourTheme || "—"}
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-[#4A3A40]">
+                            <Camera className="h-3.5 w-3.5 text-[#9E4765]" />
+                            {photoCount}
+                          </span>
+                          {(order.driveFolderUrl || order.driveFolderId) && (
+                            <a
+                              href={
+                                order.driveFolderUrl ||
+                                `https://drive.google.com/drive/folders/${order.driveFolderId}`
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Open order photo folder in Google Drive"
+                              className="inline-flex items-center gap-1 rounded-full border border-[#EAD4DF] bg-[#FDF8FA] px-2 py-0.5 text-[10px] font-medium text-[#9E4765] hover:bg-[#F6EBF0] transition-colors"
+                            >
+                              Drive
+                              <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <Badge
+                          variant={statusMeta.variant}
+                          className="rounded-full"
+                        >
+                          {statusMeta.label}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-5 text-xs text-[#4A3A40]">
+                        <div className="font-medium text-[#1F1619]">
+                          {new Date(order.updatedAt).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </div>
+                        <div className="text-[11px] text-[#8C7A80]">
+                          {new Date(order.updatedAt).toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 text-right">
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/admin/orders/${order.id}`}>
+                            Open Brief
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-                {currentPage < totalPages ? (
-                  <Link
-                    href={buildPageUrl(params, currentPage + 1)}
-                    className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-                  >
-                    Next
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </Link>
-                ) : (
-                  <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
-                    Next
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </span>
+        {/* Elegant Editorial Pagination Bar (10 per page) */}
+        {totalCount > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[#EFE6E0] bg-[#FCF9F7] px-6 py-4">
+            <p className="text-xs text-[#6E5A61]">
+              Showing{" "}
+              <strong className="font-medium text-[#1F1619]">
+                {startIndex + 1}&ndash;
+                {Math.min(startIndex + PAGE_SIZE, totalCount)}
+              </strong>{" "}
+              of{" "}
+              <strong className="font-medium text-[#1F1619]">
+                {totalCount}
+              </strong>{" "}
+              {totalCount === 1 ? "magazine issue" : "magazine issues"} (10 per
+              page)
+            </p>
+
+            <nav
+              aria-label="Orders pagination"
+              className="flex items-center gap-1.5"
+            >
+              {currentPage > 1 ? (
+                <Link
+                  href={buildPageUrl(params, currentPage - 1)}
+                  className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Previous
+                </Link>
+              ) : (
+                <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Previous
+                </span>
+              )}
+
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (pNum) => {
+                    const isActive = pNum === currentPage;
+                    return (
+                      <Link
+                        key={pNum}
+                        href={buildPageUrl(params, pNum)}
+                        aria-current={isActive ? "page" : undefined}
+                        className={
+                          isActive
+                            ? "inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#9E4765] text-xs font-semibold text-white shadow-2xs"
+                            : "inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#EAE0DA] bg-white text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
+                        }
+                      >
+                        {pNum}
+                      </Link>
+                    );
+                  }
                 )}
-              </nav>
-            </div>
-          </>
+              </div>
+
+              {currentPage < totalPages ? (
+                <Link
+                  href={buildPageUrl(params, currentPage + 1)}
+                  className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
+                >
+                  Next
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              ) : (
+                <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
+                  Next
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </span>
+              )}
+            </nav>
+          </div>
         )}
       </div>
     </div>
