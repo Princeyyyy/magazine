@@ -242,7 +242,6 @@ async function seed() {
         birthday_date: "2001-11-14",
         age_turning: 25,
         colour_theme: "Pink and girly",
-        cover_headline: "Zuri: Turning 25 in Full Bloom",
         how_did_you_meet:
           "We sat next to each other during our first week at Strathmore University and bonded over iced caramel lattes.",
         how_long_known: "7 unforgettable years",
@@ -273,8 +272,7 @@ async function seed() {
         favourite_hobby: "Floral arranging and hosting",
         favourite_flowers: "Blush pink peonies and white ranunculus",
         favourite_colours: "Rosewater pink, champagne, espresso",
-        favourite_book_or_genre: "Everything I Know About Love by Dolly Alderton",
-        favourite_film_genre: "Classic 2000s rom-coms",
+        favourite_book: "Everything I Know About Love by Dolly Alderton",
         top_movies: [
           { title: "The Devil Wears Prada" },
           { title: "How to Lose a Guy in 10 Days" },
@@ -328,21 +326,9 @@ async function seed() {
           { song_title: "Adorn", artist: "Miguel" },
         ],
         key_moments: [
-          {
-            date: "September 2019",
-            place: "Nairobi",
-            what_happened: "The day we met in university orientation and talked for four hours straight.",
-          },
-          {
-            date: "December 2023",
-            place: "Diani Beach",
-            what_happened: "Our first girls' coastal trip where we watched the sunrise on the beach.",
-          },
-          {
-            date: "July 2025",
-            place: "Zanzibar",
-            what_happened: "Sunset dhow cruise celebrating her promotion!",
-          },
+          { what_happened: "The day we met in university orientation and talked for four hours straight." },
+          { what_happened: "Our first girls' coastal trip where we watched the sunrise on Diani beach." },
+          { what_happened: "Sunset dhow cruise in Zanzibar celebrating her promotion!" },
         ],
         funniest_or_most_iconic_moment:
           "When she accidentally ordered a family-sized seafood tower for just the two of us in Mombasa and insisted we pose with it like a magazine shoot.",
@@ -402,7 +388,6 @@ async function seed() {
         birthday_date: "1996-11-02",
         age_turning: 30,
         colour_theme: "Neutral and minimal",
-        cover_headline: "Thirty, Thriving & Unstoppable",
         how_did_you_meet: "Sisters from day one — my biggest role model and confidante.",
         how_long_known: "All 30 years of her life",
         what_she_means_to_you:
@@ -431,16 +416,8 @@ async function seed() {
           { song_title: " Smooth Operator", artist: "Sade" },
         ],
         key_moments: [
-          {
-            date: "May 2021",
-            place: "Nairobi",
-            what_happened: "Passed her professional architectural registration on the first attempt.",
-          },
-          {
-            date: "October 2024",
-            place: "Milan",
-            what_happened: "Our sisters trip to Salone del Mobile.",
-          },
+          { what_happened: "Passed her professional architectural registration on the first attempt." },
+          { what_happened: "Our sisters trip to Salone del Mobile in Milan." },
         ],
         hopes_and_wishes:
           "Welcome to your thirties, Shiku! May this decade bring your own studio, serene travels, and endless joy.",
@@ -487,7 +464,6 @@ async function seed() {
         birthday_date: "1994-10-30",
         age_turning: 32,
         colour_theme: "Black and white",
-        cover_headline: "The Gentleman's Issue: Kwame at 32",
         how_did_you_meet: "At a contemporary art gallery opening in Westlands six years ago.",
         how_long_known: "6 years together, 3 years married",
         what_she_means_to_you:
@@ -561,7 +537,6 @@ async function seed() {
         birthday_date: "1999-10-28",
         age_turning: 27,
         colour_theme: "Bright and colourful",
-        cover_headline: "Golden Hour: The Amina Issue",
         how_did_you_meet: "On a flight from Nairobi to Lamu where we ended up talking the entire journey.",
         how_long_known: "4 magical years",
         what_she_means_to_you:
@@ -614,7 +589,6 @@ async function seed() {
         birthday_date: "1998-11-24",
         age_turning: 28,
         colour_theme: "Neutral and minimal",
-        cover_headline: "Nyasha: Effortless Grace at 28",
         what_she_means_to_you:
           "She has been my built-in best friend since day one, the calm in every storm and the woman with the best advice in Nairobi.",
         three_words_describe_her: "Poised, warm-hearted, visionary",
@@ -692,6 +666,7 @@ async function seed() {
         jpegBuffer
       );
 
+      const photoCategory = i >= 2 ? "shared" : "solo";
       await db.insert(photos).values({
         orderId: insertedOrder.id,
         storageProvider: uploaded.storageProvider,
@@ -702,6 +677,7 @@ async function seed() {
         caption,
         isCover: i === 0,
         sortOrder: i,
+        category: photoCategory,
         uploadedAt: new Date(spec.createdAt.getTime() + i * 60_000),
       });
     }

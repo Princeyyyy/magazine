@@ -61,6 +61,7 @@ interface AdminPhotoItem {
   caption: string;
   isCover: boolean;
   sortOrder: number;
+  category?: "solo" | "shared";
   uploadedAt: string;
 }
 
@@ -766,77 +767,175 @@ export function AdminOrderDetailClient({
                     </div>
                   )}
 
-                  {/* Clean Text Manifest of Filenames & Captions */}
-                  {photos.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-medium uppercase tracking-wider text-[#7A686E]">
-                          Photo Filenames &amp; Customer Captions ({photos.length})
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void copyText(
-                              "photo-captions",
-                              photos
-                                .map(
-                                  (p, idx) =>
-                                    `${idx + 1}. ${p.originalName}${
-                                      p.isCover ? " [COVER]" : ""
-                                    } — ${p.caption || "(no caption)"}`
-                                )
-                                .join("\n"),
-                              "Photo captions list"
-                            )
-                          }
-                          className="inline-flex items-center gap-1 rounded-full border border-[#EAE0DA] bg-[#FCF9F7] px-2.5 py-1 text-[11px] text-[#5C4950] hover:border-[#9E4765] hover:text-[#9E4765] cursor-pointer"
-                        >
-                          {copiedKey === "photo-captions" ? (
-                            <>
-                              <Check className="h-3 w-3 text-[#15803D]" />
-                              Copied List
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" />
-                              Copy Captions List
-                            </>
-                          )}
-                        </button>
-                      </div>
+                  {/* Clean Text Manifest of Filenames & Captions Split by Solo & Shared */}
+                  {photos.length > 0 && (() => {
+                    const soloPhotos = photos.filter((p) => p.category !== "shared");
+                    const sharedPhotos = photos.filter((p) => p.category === "shared");
 
-                      <div className="rounded-2xl border border-[#EFE6E0] bg-[#FCF9F7]/60 divide-y divide-[#F3ECE7] max-h-72 overflow-y-auto">
-                        {photos.map((photo, idx) => (
-                          <div
-                            key={photo.id}
-                            className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="font-mono text-[11px] text-[#96838A]">
-                                {String(idx + 1).padStart(2, "0")}.
-                              </span>
-                              <span className="font-medium text-[#1F1619] truncate">
-                                {photo.originalName}
-                              </span>
-                              {photo.isCover && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#9E4765] px-2 py-0.5 text-[10px] font-medium text-white shrink-0">
-                                  <Star className="h-2.5 w-2.5 fill-current" />
-                                  Cover
-                                </span>
-                              )}
+                    return (
+                      <div className="space-y-6 pt-2">
+                        {/* Solo Photos Section */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#7A686E]">
+                                Solo Photos &bull; Drive: Solo Photos/
+                              </h3>
+                              <Badge variant="outline" className="text-[10px]">
+                                {soloPhotos.length} photos
+                              </Badge>
                             </div>
-                            <span className="text-[#5C4950] truncate max-w-[50%]">
-                              {photo.caption || (
-                                <span className="italic text-[#B5A3A9]">
-                                  No caption
-                                </span>
-                              )}
-                            </span>
+                            {soloPhotos.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void copyText(
+                                    "solo-photo-captions",
+                                    soloPhotos
+                                      .map(
+                                        (p, idx) =>
+                                          `${idx + 1}. ${p.originalName}${
+                                            p.isCover ? " [COVER]" : ""
+                                          } — ${p.caption || "(no caption)"}`
+                                      )
+                                      .join("\n"),
+                                    "Solo photo captions list"
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 rounded-full border border-[#EAE0DA] bg-[#FCF9F7] px-2.5 py-1 text-[11px] text-[#5C4950] hover:border-[#9E4765] hover:text-[#9E4765] cursor-pointer"
+                              >
+                                {copiedKey === "solo-photo-captions" ? (
+                                  <>
+                                    <Check className="h-3 w-3 text-[#15803D]" />
+                                    Copied Solo
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-3 w-3" />
+                                    Copy Solo List
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
-                        ))}
+
+                          {soloPhotos.length === 0 ? (
+                            <p className="text-xs italic text-[#A39197] p-3 rounded-xl border border-[#EFE6E0] bg-[#FCF9F7]/60">
+                              No solo photos uploaded yet.
+                            </p>
+                          ) : (
+                            <div className="rounded-2xl border border-[#EFE6E0] bg-[#FCF9F7]/60 divide-y divide-[#F3ECE7] max-h-60 overflow-y-auto">
+                              {soloPhotos.map((photo, idx) => (
+                                <div
+                                  key={photo.id}
+                                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="font-mono text-[11px] text-[#96838A]">
+                                      {String(idx + 1).padStart(2, "0")}.
+                                    </span>
+                                    <span className="font-medium text-[#1F1619] truncate">
+                                      {photo.originalName}
+                                    </span>
+                                    {photo.isCover && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-[#9E4765] px-2 py-0.5 text-[10px] font-medium text-white shrink-0">
+                                        <Star className="h-2.5 w-2.5 fill-current" />
+                                        Cover
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[#5C4950] truncate max-w-[50%]">
+                                    {photo.caption || (
+                                      <span className="italic text-[#B5A3A9]">
+                                        No caption
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Shared Photos Section */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#7A686E]">
+                                Shared Photos with Others &bull; Drive: Shared Photos/
+                              </h3>
+                              <Badge variant="outline" className="text-[10px]">
+                                {sharedPhotos.length} photos
+                              </Badge>
+                            </div>
+                            {sharedPhotos.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void copyText(
+                                    "shared-photo-captions",
+                                    sharedPhotos
+                                      .map(
+                                        (p, idx) =>
+                                          `${idx + 1}. ${p.originalName} — ${
+                                            p.caption || "(no caption)"
+                                          }`
+                                      )
+                                      .join("\n"),
+                                    "Shared photo captions list"
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 rounded-full border border-[#EAE0DA] bg-[#FCF9F7] px-2.5 py-1 text-[11px] text-[#5C4950] hover:border-[#9E4765] hover:text-[#9E4765] cursor-pointer"
+                              >
+                                {copiedKey === "shared-photo-captions" ? (
+                                  <>
+                                    <Check className="h-3 w-3 text-[#15803D]" />
+                                    Copied Shared
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-3 w-3" />
+                                    Copy Shared List
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {sharedPhotos.length === 0 ? (
+                            <p className="text-xs italic text-[#A39197] p-3 rounded-xl border border-[#EFE6E0] bg-[#FCF9F7]/60">
+                              No shared photos uploaded yet.
+                            </p>
+                          ) : (
+                            <div className="rounded-2xl border border-[#EFE6E0] bg-[#FCF9F7]/60 divide-y divide-[#F3ECE7] max-h-60 overflow-y-auto">
+                              {sharedPhotos.map((photo, idx) => (
+                                <div
+                                  key={photo.id}
+                                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="font-mono text-[11px] text-[#96838A]">
+                                      {String(idx + 1).padStart(2, "0")}.
+                                    </span>
+                                    <span className="font-medium text-[#1F1619] truncate">
+                                      {photo.originalName}
+                                    </span>
+                                  </div>
+                                  <span className="text-[#5C4950] truncate max-w-[50%]">
+                                    {photo.caption || (
+                                      <span className="italic text-[#B5A3A9]">
+                                        No caption
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </section>
               );
             }

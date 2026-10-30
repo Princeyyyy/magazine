@@ -10,6 +10,7 @@ export interface UploadSessionFileMeta {
   mimeType: string;
   sizeBytes: number;
   origin?: string;
+  category?: "solo" | "shared";
 }
 
 export interface UploadSessionResult {
@@ -67,6 +68,7 @@ interface LocalUploadSession {
   sizeBytes: number;
   tempFilePath: string;
   finalFileId: string;
+  category: "solo" | "shared";
   createdAt: number;
 }
 
@@ -95,6 +97,8 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
   async createOrderFolder(orderId: string, label: string): Promise<string> {
     const dir = this.getOrderDir(orderId);
     await fs.mkdir(dir, { recursive: true });
+    await fs.mkdir(path.join(dir, "Solo Photos"), { recursive: true });
+    await fs.mkdir(path.join(dir, "Shared Photos"), { recursive: true });
     await fs.writeFile(
       path.join(dir, "_folder_meta.json"),
       JSON.stringify({ orderId, label, createdAt: new Date().toISOString() }, null, 2)
@@ -149,6 +153,7 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
       sizeBytes: fileMeta.sizeBytes,
       tempFilePath,
       finalFileId,
+      category: fileMeta.category || "solo",
       createdAt: Date.now(),
     });
 
@@ -205,7 +210,10 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
     }
 
     const orderDir = this.getOrderDir(orderId);
-    const finalPath = path.join(orderDir, session.finalFileId);
+    const categoryFolder = session.category === "shared" ? "Shared Photos" : "Solo Photos";
+    const catDir = path.join(orderDir, categoryFolder);
+    await fs.mkdir(catDir, { recursive: true });
+    const finalPath = path.join(catDir, session.finalFileId);
 
     const stat = await fs.stat(session.tempFilePath);
     await fs.rename(session.tempFilePath, finalPath);
@@ -263,7 +271,26 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
     let filePath: string | null = null;
 
     if (orderId) {
-      filePath = path.join(this.getOrderDir(orderId), safeFileId);
+      const direct = path.join(this.getOrderDir(orderId), safeFileId);
+      const solo = path.join(this.getOrderDir(orderId), "Solo Photos", safeFileId);
+      const shared = path.join(this.getOrderDir(orderId), "Shared Photos", safeFileId);
+
+      try {
+        await fs.access(direct);
+        filePath = direct;
+      } catch {
+        try {
+          await fs.access(solo);
+          filePath = solo;
+        } catch {
+          try {
+            await fs.access(shared);
+            filePath = shared;
+          } catch {
+            filePath = null;
+          }
+        }
+      }
     } else {
       // Search order directories
       const dirs = await fs.readdir(this.baseDir).catch(() => []);
@@ -300,8 +327,10 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
   async deleteFile(fileId: string, orderId?: string): Promise<void> {
     if (!orderId) return;
     const safeFileId = path.basename(fileId);
-    const filePath = path.join(this.getOrderDir(orderId), safeFileId);
-    await fs.unlink(filePath).catch(() => {});
+    const orderDir = this.getOrderDir(orderId);
+    await fs.unlink(path.join(orderDir, safeFileId)).catch(() => {});
+    await fs.unlink(path.join(orderDir, "Solo Photos", safeFileId)).catch(() => {});
+    await fs.unlink(path.join(orderDir, "Shared Photos", safeFileId)).catch(() => {});
   }
 
   async testConnection(): Promise<{ ok: boolean; message: string }> {
@@ -341,6 +370,35 @@ export class DriveStorage implements PhotoStorageAdapter {
     return google.drive({ version: "v3", auth: this.getOAuthClient() });
   }
 
+  private async getOrCreateSubfolder(parentFolderId: string, name: string): Promise<string> {
+    const drive = this.getDriveClient();
+    const safeName = name.replace(/'/g, "\\'");
+    const query = `name = '${safeName}' and '${parentFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const searchRes = await drive.files.list({
+      q: query,
+      fields: "files(id, name)",
+      spaces: "drive",
+    });
+
+    if (searchRes.data.files && searchRes.data.files.length > 0 && searchRes.data.files[0]?.id) {
+      return searchRes.data.files[0].id;
+    }
+
+    const createRes = await drive.files.create({
+      requestBody: {
+        name,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [parentFolderId],
+      },
+      fields: "id",
+    });
+
+    if (!createRes.data.id) {
+      throw new Error(`Failed to create Google Drive subfolder: ${name}`);
+    }
+    return createRes.data.id;
+  }
+
   async createOrderFolder(_orderId: string, label: string): Promise<string> {
     const drive = this.getDriveClient();
     const res = await drive.files.create({
@@ -355,7 +413,19 @@ export class DriveStorage implements PhotoStorageAdapter {
     if (!res.data.id) {
       throw new Error("Google Drive did not return a folder ID.");
     }
-    return res.data.id;
+    const orderFolderId = res.data.id;
+
+    // Create Solo Photos and Shared Photos subfolders inside the order folder
+    try {
+      await Promise.all([
+        this.getOrCreateSubfolder(orderFolderId, "Solo Photos"),
+        this.getOrCreateSubfolder(orderFolderId, "Shared Photos"),
+      ]);
+    } catch (err) {
+      console.warn("Could not pre-create subfolders in Drive:", err);
+    }
+
+    return orderFolderId;
   }
 
   async renameOrderFolder(driveFolderId: string, newLabel: string): Promise<void> {
@@ -387,13 +457,26 @@ export class DriveStorage implements PhotoStorageAdapter {
       throw new Error("Could not obtain Google Drive access token from refresh token.");
     }
 
-    const parentFolder = driveFolderId || env.DRIVE_ROOT_FOLDER_ID;
+    let targetFolderId = driveFolderId || env.DRIVE_ROOT_FOLDER_ID;
+
+    if (driveFolderId) {
+      const category = fileMeta.category === "shared" ? "shared" : "solo";
+      const subfolderName = category === "shared" ? "Shared Photos" : "Solo Photos";
+      try {
+        targetFolderId = await this.getOrCreateSubfolder(driveFolderId, subfolderName);
+      } catch (err) {
+        console.warn(`Could not resolve subfolder "${subfolderName}", using order folder:`, err);
+        targetFolderId = driveFolderId;
+      }
+    }
+
     const metadata = {
       name: fileMeta.fileName,
       mimeType: fileMeta.mimeType,
-      ...(parentFolder ? { parents: [parentFolder] } : {}),
+      ...(targetFolderId ? { parents: [targetFolderId] } : {}),
       appProperties: {
         orderId,
+        category: fileMeta.category || "solo",
       },
     };
 

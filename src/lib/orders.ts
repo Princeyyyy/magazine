@@ -25,6 +25,8 @@ export function hasMeaningfulValues(values: Record<string, unknown>): boolean {
     if (
       key === "subject_gender" ||
       key === "photos" ||
+      key === "solo_photos" ||
+      key === "shared_photos" ||
       key === "honeypot" ||
       key === "token" ||
       key === "permission_consent"
@@ -150,9 +152,14 @@ export async function getDraftByToken(
     caption: p.caption,
     isCover: p.isCover,
     sortOrder: p.sortOrder,
+    category: (p.category === "shared" ? "shared" : "solo") as "solo" | "shared",
     previewUrl: buildPhotoPreviewUrl(p.id, order.id),
   }));
 
+  const soloPhotos = photoItems.filter((p) => p.category !== "shared");
+  const sharedPhotos = photoItems.filter((p) => p.category === "shared");
+  values["solo_photos"] = soloPhotos;
+  values["shared_photos"] = sharedPhotos;
   values["photos"] = photoItems;
 
   return {
@@ -335,7 +342,7 @@ export async function saveDraftAnswers(
   await db.update(orders).set(topLevelUpdates).where(eq(orders.id, order.id));
 
   const valuesArray = Object.entries(partialValues)
-    .filter(([key, rawVal]) => validKeys.has(key) && key !== "photos" && rawVal !== undefined)
+    .filter(([key, rawVal]) => validKeys.has(key) && key !== "photos" && key !== "solo_photos" && key !== "shared_photos" && rawVal !== undefined)
     .map(([key, rawVal]) => ({
       orderId: order.id,
       questionKey: key,

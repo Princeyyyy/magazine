@@ -42,6 +42,9 @@ interface PhotoUploaderProps {
   errorMessage?: string;
   gender?: string;
   onDraftCreated?: (token: string, reference: string) => void;
+  category?: "solo" | "shared";
+  minPhotos?: number;
+  maxPhotos?: number;
 }
 
 const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB chunks for resumable upload
@@ -75,7 +78,22 @@ export function PhotoUploader({
   errorMessage,
   gender = "Female",
   onDraftCreated,
+  category = "solo",
+  minPhotos,
+  maxPhotos,
 }: PhotoUploaderProps) {
+  const isSolo = category === "solo";
+  const minRequired =
+    minPhotos ??
+    (isSolo
+      ? PHOTO_UPLOAD_CONFIG.soloMinFiles
+      : PHOTO_UPLOAD_CONFIG.sharedMinFiles);
+  const maxAllowed =
+    maxPhotos ??
+    (isSolo
+      ? PHOTO_UPLOAD_CONFIG.soloMaxFiles
+      : PHOTO_UPLOAD_CONFIG.sharedMaxFiles);
+
   const [queue, setQueue] = useState<UploadingFileState[]>([]);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -122,6 +140,7 @@ export function PhotoUploader({
               fileName: item.file.name,
               mimeType: item.file.type || "image/jpeg",
               sizeBytes: item.file.size,
+              category,
             }),
           });
 
@@ -235,6 +254,7 @@ export function PhotoUploader({
             sessionId,
             storageFileId: driveFileId,
             caption: "",
+            category,
           }),
         });
 
@@ -251,6 +271,7 @@ export function PhotoUploader({
 
         const finalizedPhoto: UploadedPhotoItem = {
           ...finalData.photo,
+          category,
           previewUrl: item.localPreviewUrl || finalData.photo.previewUrl,
         };
 
@@ -268,7 +289,7 @@ export function PhotoUploader({
         );
       }
     },
-    [updatePhotos]
+    [category, updatePhotos]
   );
 
   const handleFilesSelected = useCallback(
@@ -278,9 +299,9 @@ export function PhotoUploader({
       if (incoming.length === 0) return;
 
       const currentTotal = photosRef.current.length + queue.length;
-      if (currentTotal + incoming.length > PHOTO_UPLOAD_CONFIG.maxFiles) {
+      if (currentTotal + incoming.length > maxAllowed) {
         setGlobalError(
-          `You can upload a maximum of ${PHOTO_UPLOAD_CONFIG.maxFiles} photos. You currently have ${currentTotal}.`
+          `You can upload a maximum of ${maxAllowed} ${isSolo ? "solo" : "shared"} photos. You currently have ${currentTotal}.`
         );
         return;
       }
@@ -328,10 +349,11 @@ export function PhotoUploader({
         await uploadSingleFile(item);
       }
     },
-    [queue.length, uploadSingleFile]
+    [isSolo, maxAllowed, queue.length, uploadSingleFile]
   );
 
   const handleSetCover = async (photoId: string) => {
+    if (!isSolo) return;
     updatePhotos((prev) =>
       prev.map((p) => ({
         ...p,
@@ -367,9 +389,11 @@ export function PhotoUploader({
 
   const handleRemovePhoto = async (photoId: string) => {
     const remaining = photosRef.current.filter((p) => p.id !== photoId);
-    const firstRemaining = remaining[0];
-    if (remaining.length > 0 && !remaining.some((p) => p.isCover) && firstRemaining) {
-      remaining[0] = { ...firstRemaining, isCover: true };
+    if (isSolo) {
+      const firstRemaining = remaining[0];
+      if (remaining.length > 0 && !remaining.some((p) => p.isCover) && firstRemaining) {
+        remaining[0] = { ...firstRemaining, isCover: true };
+      }
     }
     updatePhotos(() => remaining);
 
@@ -382,8 +406,6 @@ export function PhotoUploader({
   };
 
   const count = photos.length;
-  const minRequired = PHOTO_UPLOAD_CONFIG.minFiles;
-  const maxAllowed = PHOTO_UPLOAD_CONFIG.maxFiles;
   const meetsMinimum = count >= minRequired;
 
   return (
@@ -393,7 +415,7 @@ export function PhotoUploader({
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <span className="font-serif text-xl font-normal text-[#1F1619]">
-              {count} of {minRequired} minimum
+              {count} of {minRequired} minimum {isSolo ? "solo photos" : "shared photos"}
             </span>
             {meetsMinimum ? (
               <span className="inline-flex items-center gap-1 rounded-full text-xs font-medium text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] px-2.5 py-0.5">
@@ -408,7 +430,9 @@ export function PhotoUploader({
           </div>
           {!meetsMinimum && (
             <p className="text-xs text-[#7A686E]">
-              A few more photos will make the magazine shine
+              {isSolo
+                ? "Solo portraits and candid shots make the best cover and feature spreads"
+                : "Photos together with family, partner, or friends for memory spreads"}
             </p>
           )}
         </div>
@@ -464,13 +488,20 @@ export function PhotoUploader({
           <Upload className="h-5 w-5" />
         </div>
         <p className="font-serif text-xl text-[#1F1619] mb-1">
-          {adaptCopyByGender(
-            "Drag and drop her photos here, or browse from your phone or computer",
-            gender
-          )}
+          {isSolo
+            ? adaptCopyByGender(
+                "Drag and drop her solo photos here, or browse from your phone or computer",
+                gender
+              )
+            : adaptCopyByGender(
+                "Drag and drop shared photos of her with others here, or browse from your phone or computer",
+                gender
+              )}
         </p>
         <p className="text-xs text-[#7A686E] mb-5">
-          Accepts JPG, JPEG, PNG, HEIC, HEIF &bull; Up to {PHOTO_UPLOAD_CONFIG.maxFileSizeMB} MB per photo &bull; Originals kept untouched
+          {isSolo
+            ? `Min ${minRequired}, Max ${maxAllowed} &bull; Accepts JPG, PNG, HEIC &bull; Up to ${PHOTO_UPLOAD_CONFIG.maxFileSizeMB} MB per photo`
+            : `Min ${minRequired}, Max ${maxAllowed} &bull; Accepts JPG, PNG, HEIC &bull; Up to ${PHOTO_UPLOAD_CONFIG.maxFileSizeMB} MB per photo`}
         </p>
         <Button
           type="button"
@@ -572,7 +603,9 @@ export function PhotoUploader({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-wider text-[#7A686E]">
-              Uploaded Photos ({photos.length}) &mdash; Click any photo to mark it as the cover
+              {isSolo
+                ? `Uploaded Solo Photos (${photos.length}) — Click any photo to mark it as the cover`
+                : `Uploaded Shared Photos (${photos.length})`}
             </p>
           </div>
 
@@ -582,23 +615,36 @@ export function PhotoUploader({
                 key={photo.id}
                 className={cn(
                   "group border bg-white transition-all flex flex-col",
-                  photo.isCover
+                  isSolo && photo.isCover
                     ? "border-[#9E4765] ring-1 ring-[#9E4765]"
                     : "border-[#E3D4CC]"
                 )}
               >
                 <div
-                  onClick={() => void handleSetCover(photo.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      void handleSetCover(photo.id);
-                    }
+                  onClick={() => {
+                    if (isSolo) void handleSetCover(photo.id);
                   }}
-                  aria-label={`Select ${photo.originalName} as magazine cover`}
-                  className="relative aspect-[4/5] w-full bg-[#F5ECE8] overflow-hidden cursor-pointer"
+                  role={isSolo ? "button" : undefined}
+                  tabIndex={isSolo ? 0 : undefined}
+                  onKeyDown={
+                    isSolo
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            void handleSetCover(photo.id);
+                          }
+                        }
+                      : undefined
+                  }
+                  aria-label={
+                    isSolo
+                      ? `Select ${photo.originalName} as magazine cover`
+                      : photo.originalName
+                  }
+                  className={cn(
+                    "relative aspect-[4/5] w-full bg-[#F5ECE8] overflow-hidden",
+                    isSolo ? "cursor-pointer" : ""
+                  )}
                 >
                   {photo.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -614,19 +660,21 @@ export function PhotoUploader({
                     </div>
                   )}
 
-                  {/* Cover Badge / Button */}
-                  <div className="absolute top-2.5 left-2.5">
-                    {photo.isCover ? (
-                      <span className="inline-flex items-center gap-1 bg-[#9E4765] text-white text-[11px] font-medium px-2.5 py-1 shadow-xs">
-                        <Star className="h-3 w-3 fill-current" />
-                        Cover Photo
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 bg-white/90 text-[#1F1619] text-[11px] font-medium px-2 py-0.5 opacity-90 group-hover:bg-[#9E4765] group-hover:text-white transition-colors">
-                        Use as cover
-                      </span>
-                    )}
-                  </div>
+                  {/* Cover Badge / Button (Solo only) */}
+                  {isSolo && (
+                    <div className="absolute top-2.5 left-2.5">
+                      {photo.isCover ? (
+                        <span className="inline-flex items-center gap-1 bg-[#9E4765] text-white text-[11px] font-medium px-2.5 py-1 shadow-xs">
+                          <Star className="h-3 w-3 fill-current" />
+                          Cover Photo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 bg-white/90 text-[#1F1619] text-[11px] font-medium px-2 py-0.5 opacity-90 group-hover:bg-[#9E4765] group-hover:text-white transition-colors">
+                          Use as cover
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Delete Photo Button */}
                   <button

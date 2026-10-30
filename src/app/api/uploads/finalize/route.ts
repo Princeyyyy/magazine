@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
       sessionId?: string;
       storageFileId?: string;
       caption?: string;
+      category?: "solo" | "shared";
     };
 
     if (!body.draftToken || !body.sessionId) {
@@ -54,12 +55,21 @@ export async function POST(req: NextRequest) {
       verifiedMime = magicCheck.detectedMime;
     }
 
-    // Determine sort order & whether this is the first photo (default to cover)
+    const category = body.category === "shared" ? "shared" : "solo";
+
+    // Determine sort order & whether this is the first solo photo (default to cover)
     const existingCountRes = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(photos)
       .where(eq(photos.orderId, order.id));
     const existingCount = existingCountRes[0]?.count ?? 0;
+
+    const existingCoverRes = await db
+      .select({ id: photos.id })
+      .from(photos)
+      .where(sql`${photos.orderId} = ${order.id} AND ${photos.isCover} = true`);
+    const hasCover = existingCoverRes.length > 0;
+    const isCover = category === "solo" && !hasCover;
 
     const [inserted] = await db
       .insert(photos)
@@ -71,8 +81,9 @@ export async function POST(req: NextRequest) {
         mime: verifiedMime,
         sizeBytes: finalized.sizeBytes,
         caption: body.caption?.trim() || "",
-        isCover: existingCount === 0,
+        isCover,
         sortOrder: existingCount,
+        category,
       })
       .returning();
 
@@ -96,6 +107,7 @@ export async function POST(req: NextRequest) {
         caption: inserted.caption,
         isCover: inserted.isCover,
         sortOrder: inserted.sortOrder,
+        category: inserted.category as "solo" | "shared",
         previewUrl: buildPhotoPreviewUrl(inserted.id, order.id),
       },
     });

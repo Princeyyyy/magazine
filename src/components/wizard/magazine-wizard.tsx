@@ -60,7 +60,11 @@ function computeInitialHighestStep(
       for (const field of group.fields) {
         if (field.key === "subject_gender") continue;
         if (field.type === "photoUpload") {
-          if (photoList.length > 0) hasAnswerOnPage = true;
+          const isShared = field.key === "shared_photos";
+          const matchPhotos = photoList.filter((p) =>
+            isShared ? p.category === "shared" : p.category !== "shared"
+          );
+          if (matchPhotos.length > 0) hasAnswerOnPage = true;
           continue;
         }
         const v = vals[field.key];
@@ -88,7 +92,16 @@ function computeInitialHighestStep(
       highest = i;
       // Also check if this page is completely valid; if so, unlock the next page too
       const schema = buildPageZodSchema(page);
-      if (schema.safeParse({ ...vals, photos: photoList }).success) {
+      const soloPhotos = photoList.filter((p) => p.category !== "shared");
+      const sharedPhotos = photoList.filter((p) => p.category === "shared");
+      if (
+        schema.safeParse({
+          ...vals,
+          solo_photos: soloPhotos,
+          shared_photos: sharedPhotos,
+          photos: photoList,
+        }).success
+      ) {
         highest = Math.min(FORM_PAGES.length, i + 1);
       }
     }
@@ -566,12 +579,16 @@ export function MagazineWizard({
             addedCount === 1
               ? "Photo added to your issue"
               : `${addedCount} photos added to your issue`,
-            `${nextPhotos.length} of 15 photos saved to your private folder.`
+            `${nextPhotos.length} photos saved to your private folder.`
           );
         }
         return nextPhotos;
       });
+      const solo = nextPhotos.filter((p) => p.category !== "shared");
+      const shared = nextPhotos.filter((p) => p.category === "shared");
       setFieldValue("photos", nextPhotos);
+      setFieldValue("solo_photos", solo);
+      setFieldValue("shared_photos", shared);
     },
     [setFieldValue, showEditorialToast]
   );
@@ -606,8 +623,12 @@ export function MagazineWizard({
     if (!pageConfig) return true;
 
     const pageSchema = buildPageZodSchema(pageConfig);
+    const soloPhotos = photos.filter((p) => p.category !== "shared");
+    const sharedPhotos = photos.filter((p) => p.category === "shared");
     const pagePayload: Record<string, unknown> = {
       ...values,
+      solo_photos: soloPhotos,
+      shared_photos: sharedPhotos,
       photos,
     };
 
@@ -785,12 +806,19 @@ export function MagazineWizard({
 
     try {
       let activeToken = draftTokenRef.current;
+      const soloPhotos = photos.filter((p) => p.category !== "shared");
+      const sharedPhotos = photos.filter((p) => p.category === "shared");
       if (!activeToken) {
         const saveRes = await fetch("/api/orders/draft", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            values: { ...valuesRef.current, photos },
+            values: {
+              ...valuesRef.current,
+              solo_photos: soloPhotos,
+              shared_photos: sharedPhotos,
+              photos,
+            },
             honeypot,
           }),
         });
@@ -816,7 +844,12 @@ export function MagazineWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token: activeToken,
-          values: { ...valuesRef.current, photos },
+          values: {
+            ...valuesRef.current,
+            solo_photos: soloPhotos,
+            shared_photos: sharedPhotos,
+            photos,
+          },
           honeypot,
         }),
       });
@@ -1177,11 +1210,29 @@ export function MagazineWizard({
       }
 
       case "photoUpload": {
+        const category =
+          field.category ?? (field.key === "shared_photos" ? "shared" : "solo");
+        const categoryPhotos = photos.filter((p) =>
+          category === "shared" ? p.category === "shared" : p.category !== "shared"
+        );
+
         return (
           <PhotoUploader
+            key={field.key}
             draftToken={draftToken}
-            photos={photos}
-            onChange={handlePhotosChange}
+            category={category}
+            minPhotos={field.minPhotos}
+            maxPhotos={field.maxPhotos}
+            photos={categoryPhotos}
+            onChange={(nextCategoryPhotos) => {
+              const otherCategoryPhotos = photos.filter((p) =>
+                category === "shared" ? p.category !== "shared" : p.category === "shared"
+              );
+              const updatedAll = [...otherCategoryPhotos, ...nextCategoryPhotos].sort(
+                (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+              );
+              handlePhotosChange(updatedAll);
+            }}
             errorMessage={fieldError}
             gender={selectedGender}
             onDraftCreated={(token, reference) => {

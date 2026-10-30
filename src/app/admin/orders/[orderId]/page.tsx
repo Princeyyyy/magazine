@@ -130,6 +130,7 @@ export default async function AdminOrderDetailPage({
           caption: p.caption,
           isCover: p.isCover,
           sortOrder: p.sortOrder,
+          category: (p.category === "shared" ? "shared" : "solo") as "solo" | "shared",
           uploadedAt: p.uploadedAt.toISOString(),
         }))}
         statusHistory={storedStatusHistory.map((sh) => ({

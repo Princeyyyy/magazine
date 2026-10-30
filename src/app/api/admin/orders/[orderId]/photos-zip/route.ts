@@ -61,14 +61,15 @@ export async function GET(
 
           try {
             const fileData = await adapter.getFile(p.storageFileId, order.id);
+            const subfolder = p.category === "shared" ? "Shared Photos" : "Solo Photos";
             const prefix = p.isCover
               ? `00_COVER_${String(i + 1).padStart(2, "0")}`
               : String(i + 1).padStart(2, "0");
-            const entryName = `${prefix}_${p.originalName}`;
+            const entryName = `${subfolder}/${prefix}_${p.originalName}`;
 
             archive.append(fileData.buffer, { name: entryName });
             captionsManifest.push(
-              `${entryName}${p.isCover ? " [COVER PHOTO]" : ""} — Caption: ${
+              `[${subfolder}] ${prefix}_${p.originalName}${p.isCover ? " [COVER PHOTO]" : ""} — Caption: ${
                 p.caption || "(none)"
               }`
             );

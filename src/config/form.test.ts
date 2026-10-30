@@ -89,7 +89,6 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         age_turning: "25",
         colour_theme: "Pink and girly",
         other_colour_theme: "",
-        cover_headline: "Zuri: Turning 25 in Style",
       });
 
       expect(result.success).toBe(true);
@@ -108,7 +107,6 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         age_turning: 25,
         colour_theme: "Other",
         other_colour_theme: "   ",
-        cover_headline: "Turning 25 in Style",
       });
 
       expect(result.success).toBe(false);
@@ -128,7 +126,6 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         age_turning: 25,
         colour_theme: "Other",
         other_colour_theme: "Champagne gold and emerald",
-        cover_headline: "Turning 25 in Style",
       });
 
       expect(result.success).toBe(true);
@@ -143,7 +140,6 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         birthday_date: "2001-11-15",
         age_turning: 0,
         colour_theme: "Black and white",
-        cover_headline: "Turning 25",
       });
       expect(zeroResult.success).toBe(false);
 
@@ -155,7 +151,6 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         birthday_date: "2001-11-15",
         age_turning: 25.5,
         colour_theme: "Black and white",
-        cover_headline: "Turning 25",
       });
       expect(floatResult.success).toBe(false);
     });
@@ -245,8 +240,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       favourite_hobby: "Pottery and floral design",
       favourite_flowers: "Blush peonies",
       favourite_colours: "Rose and sage",
-      favourite_book_or_genre: "Literary fiction",
-      favourite_film_genre: "2000s rom-coms",
+      favourite_book: "Literary fiction",
       top_movies: [
         { title: "The Devil Wears Prada" },
         { title: "How to Lose a Guy in 10 Days" },
@@ -327,50 +321,74 @@ describe("Form Configuration & Generated Zod Schemas", () => {
     });
   });
 
-  describe("Page 8: Photo Upload minimum 15 and maximum 30 validation", () => {
+  describe("Page 8: Solo Photos (min 15, max 30) and Shared Photos (min 4, max 30) validation", () => {
     const page8Schema = buildPageZodSchema(FORM_PAGES[7]!);
 
-    const makeMockPhoto = (idx: number): UploadedPhotoItem => ({
-      id: `photo-${idx}`,
+    const makeMockPhoto = (idx: number, category: "solo" | "shared" = "solo"): UploadedPhotoItem => ({
+      id: `photo-${category}-${idx}`,
       storageProvider: "local",
-      storageFileId: `file-${idx}.jpg`,
-      originalName: `img-${idx}.jpg`,
+      storageFileId: `file-${category}-${idx}.jpg`,
+      originalName: `img-${category}-${idx}.jpg`,
       mime: "image/jpeg",
       sizeBytes: 1024 * 500,
       caption: `Memory ${idx}`,
-      isCover: idx === 0,
+      isCover: category === "solo" && idx === 0,
+      category,
       sortOrder: idx,
     });
 
-    it("fails with friendly message when fewer than 15 photos are uploaded", () => {
-      const photos = Array.from({ length: 12 }, (_, i) => makeMockPhoto(i));
+    it("fails with friendly message when fewer than 15 solo photos are uploaded", () => {
+      const soloPhotos = Array.from({ length: 12 }, (_, i) => makeMockPhoto(i, "solo"));
+      const sharedPhotos = Array.from({ length: 4 }, (_, i) => makeMockPhoto(i, "shared"));
       const result = page8Schema.safeParse({
-        photos,
+        solo_photos: soloPhotos,
+        shared_photos: sharedPhotos,
         photo_link_fallback: "",
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.issues[0]?.message).toBe(
-          PHOTO_UPLOAD_CONFIG.friendlyMinMessage
+          PHOTO_UPLOAD_CONFIG.friendlyMinMessageSolo
         );
       }
     });
 
-    it("passes when 15 to 30 photos are uploaded", () => {
-      const photos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i));
+    it("fails with friendly message when fewer than 4 shared photos are uploaded", () => {
+      const soloPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "solo"));
+      const sharedPhotos = Array.from({ length: 2 }, (_, i) => makeMockPhoto(i, "shared"));
       const result = page8Schema.safeParse({
-        photos,
+        solo_photos: soloPhotos,
+        shared_photos: sharedPhotos,
+        photo_link_fallback: "",
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toBe(
+          PHOTO_UPLOAD_CONFIG.friendlyMinMessageShared
+        );
+      }
+    });
+
+    it("passes when at least 15 solo and 4 shared photos are uploaded", () => {
+      const soloPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "solo"));
+      const sharedPhotos = Array.from({ length: 4 }, (_, i) => makeMockPhoto(i, "shared"));
+      const result = page8Schema.safeParse({
+        solo_photos: soloPhotos,
+        shared_photos: sharedPhotos,
         photo_link_fallback: "https://drive.google.com/drive/folders/example",
       });
 
       expect(result.success).toBe(true);
     });
 
-    it("fails when more than 30 photos are uploaded", () => {
-      const photos = Array.from({ length: 31 }, (_, i) => makeMockPhoto(i));
+    it("fails when more than 30 photos are uploaded in either category", () => {
+      const soloPhotos = Array.from({ length: 31 }, (_, i) => makeMockPhoto(i, "solo"));
+      const sharedPhotos = Array.from({ length: 4 }, (_, i) => makeMockPhoto(i, "shared"));
       const result = page8Schema.safeParse({
-        photos,
+        solo_photos: soloPhotos,
+        shared_photos: sharedPhotos,
       });
 
       expect(result.success).toBe(false);
@@ -435,7 +453,6 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       birthday_date: "2001-11-15",
       age_turning: 25,
       colour_theme: "Pink and girly",
-      cover_headline: "Turning 25",
     });
     expect(symbolOnlyResult.success).toBe(false);
   });

@@ -70,8 +70,11 @@ CREATE TABLE IF NOT EXISTS "photos" (
   "caption" text DEFAULT '' NOT NULL,
   "is_cover" boolean DEFAULT false NOT NULL,
   "sort_order" integer DEFAULT 0 NOT NULL,
+  "category" text DEFAULT 'solo' NOT NULL,
   "uploaded_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "category" text DEFAULT 'solo' NOT NULL;
 
 CREATE TABLE IF NOT EXISTS "dev_outbox" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

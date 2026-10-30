@@ -106,19 +106,23 @@ export function ReviewStep({
                       );
 
                       if (field.type === "photoUpload") {
+                        const isShared = field.key === "shared_photos";
+                        const categoryPhotos = photos.filter((p) =>
+                          isShared ? p.category === "shared" : p.category !== "shared"
+                        );
                         return (
                           <div key={field.key} className="space-y-2.5">
                             <dt className="text-xs font-medium text-[#7A686E]">
-                              {adaptedFieldLabel} ({photos.length} uploaded)
+                              {adaptedFieldLabel} ({categoryPhotos.length} uploaded)
                             </dt>
                             <dd>
-                              {photos.length === 0 ? (
+                              {categoryPhotos.length === 0 ? (
                                 <span className="text-xs italic text-[#96838A]">
                                   No photos uploaded yet
                                 </span>
                               ) : (
                                 <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
-                                  {photos.map((photo) => (
+                                  {categoryPhotos.map((photo) => (
                                     <div
                                       key={photo.id}
                                       className="relative border border-[#E3D4CC] bg-[#FAF6F3] p-1"
@@ -135,7 +139,7 @@ export function ReviewStep({
                                           <ImageIcon className="h-5 w-5 text-[#96838A]" />
                                         )}
                                       </div>
-                                      {photo.isCover && (
+                                      {!isShared && photo.isCover && (
                                         <span className="absolute top-1.5 left-1.5 bg-[#9E4765] text-white text-[10px] px-1.5 py-0.5 flex items-center gap-0.5">
                                           <Star className="h-2.5 w-2.5 fill-current" />
                                           Cover

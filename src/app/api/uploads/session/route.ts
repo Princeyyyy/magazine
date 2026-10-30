@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       fileName?: string;
       mimeType?: string;
       sizeBytes?: number;
+      category?: "solo" | "shared";
     };
 
     if (!body.fileName || typeof body.sizeBytes !== "number") {
@@ -121,22 +122,29 @@ export async function POST(req: NextRequest) {
       throw new ValidationError("This order has already been submitted and locked.");
     }
 
-    // Check existing photo count
+    const category = body.category === "shared" ? "shared" : "solo";
+
+    // Check existing photo count for this category
     const countRes = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(photos)
-      .where(eq(photos.orderId, order.id));
+      .where(sql`${photos.orderId} = ${order.id} AND ${photos.category} = ${category}`);
     const currentCount = countRes[0]?.count ?? 0;
 
-    if (currentCount >= PHOTO_UPLOAD_CONFIG.maxFiles) {
+    const maxAllowed =
+      category === "shared"
+        ? PHOTO_UPLOAD_CONFIG.sharedMaxFiles
+        : PHOTO_UPLOAD_CONFIG.soloMaxFiles;
+
+    if (currentCount >= maxAllowed) {
       throw new ValidationError(
-        `Maximum of ${PHOTO_UPLOAD_CONFIG.maxFiles} photos reached.`
+        `Maximum of ${maxAllowed} ${category === "shared" ? "shared" : "solo"} photos reached.`
       );
     }
 
     const storage = getPhotoStorage();
 
-    // Ensure order folder exists (race-safe when uploading 15 photos at once)
+    // Ensure order folder exists (race-safe when uploading photos at once)
     const driveFolderId =
       order.driveFolderId || (await getOrCreateOrderDriveFolder(order.id));
 
@@ -148,6 +156,7 @@ export async function POST(req: NextRequest) {
         mimeType: body.mimeType || "image/jpeg",
         sizeBytes: body.sizeBytes,
         origin,
+        category,
       },
       driveFolderId
     );

@@ -12,10 +12,16 @@ export const PHOTO_UPLOAD_CONFIG = {
     "image/heic",
     "image/heif",
   ] as const,
+  soloMinFiles: 15,
+  soloMaxFiles: 30,
+  sharedMinFiles: 4,
+  sharedMaxFiles: 30,
   minFiles: 15,
   maxFiles: 30,
   maxFileSizeBytes: 15 * 1024 * 1024, // 15 MB
   maxFileSizeMB: 15,
+  friendlyMinMessageSolo: "Please upload at least 15 solo photos of her",
+  friendlyMinMessageShared: "Please upload at least 4 shared photos with others",
   friendlyMinMessage: "A few more photos will make the magazine shine",
 } as const;
 
@@ -92,6 +98,14 @@ export function adaptCopyByGender(
 
   // Ordered phrase replacements so verbs and case-sensitive pronouns transform cleanly
   const phraseRules: Array<[RegExp, string]> = [
+    [/\bPhotos of her only\b/g, `Photos of ${p.obj} only`],
+    [/\bphotos of her only\b/g, `photos of ${p.obj} only`],
+    [/\bPhotos of her\b/g, `Photos of ${p.obj}`],
+    [/\bphotos of her\b/g, `photos of ${p.obj}`],
+    [/\bof her alone\b/g, `of ${p.obj} alone`],
+    [/\bof her together\b/g, `of ${p.obj} together`],
+    [/\bher alone\b/g, `${p.obj} alone`],
+    [/\bher together\b/g, `${p.obj} together`],
     // Title / Heading phrases
     [/\bAbout Her\b/g, `About ${p.Obj}`],
     [/\bAbout her\b/g, `About ${p.obj}`],
@@ -239,6 +253,7 @@ export interface RepeatableRowsFieldConfig extends BaseFieldConfig {
 
 export interface PhotoUploadFieldConfig extends BaseFieldConfig {
   type: "photoUpload";
+  category?: "solo" | "shared";
   minPhotos: number;
   maxPhotos: number;
   maxSizeBytes: number;
@@ -393,16 +408,6 @@ export const FORM_PAGES: readonly PageConfig[] = [
               requiredWhenShown: true,
             },
             errorMessage: "Please describe your custom colour theme.",
-          },
-          {
-            key: "cover_headline",
-            label: "Cover headline",
-            type: "shortText",
-            required: true,
-            minLength: 2,
-            maxLength: 60,
-            placeholder: "e.g. Turning 25 in Style",
-            errorMessage: "Please enter a cover headline.",
           },
         ],
       },
@@ -644,24 +649,14 @@ export const FORM_PAGES: readonly PageConfig[] = [
             errorMessage: "Please share her favourite colours.",
           },
           {
-            key: "favourite_book_or_genre",
-            label: "Favourite book or genre",
+            key: "favourite_book",
+            label: "Favourite book",
             type: "shortText",
             required: true,
             minLength: 2,
             maxLength: 100,
-            placeholder: "e.g. Everything I Know About Love, literary fiction",
-            errorMessage: "Please share her favourite book or genre.",
-          },
-          {
-            key: "favourite_film_genre",
-            label: "Favourite film genre",
-            type: "shortText",
-            required: true,
-            minLength: 2,
-            maxLength: 100,
-            placeholder: "e.g. 2000s rom-coms, psychological thrillers, period dramas",
-            errorMessage: "Please share her favourite film genre.",
+            placeholder: "e.g. Everything I Know About Love, The Seven Husbands of Evelyn Hugo",
+            errorMessage: "Please share her favourite book.",
           },
         ],
       },
@@ -760,11 +755,9 @@ export const FORM_PAGES: readonly PageConfig[] = [
             key: "signature_lip_combo",
             label: "Her signature lip combo",
             type: "shortText",
-            required: true,
-            minLength: 2,
+            required: false,
             maxLength: 150,
             placeholder: "e.g. MAC Chestnut liner with Fenty Gloss Bomb",
-            errorMessage: "Please share her signature lip combo (or favourite lip product).",
           },
         ],
       },
@@ -776,11 +769,9 @@ export const FORM_PAGES: readonly PageConfig[] = [
             key: "skincare_or_hair_favourites",
             label: "Her skincare or hair favourites",
             type: "longText",
-            required: true,
-            minLength: 2,
+            required: false,
             maxLength: 800,
             placeholder: "The serums, masks, oils, or salon rituals she swears by...",
-            errorMessage: "Please share her skincare or hair favourites.",
           },
         ],
       },
@@ -792,11 +783,9 @@ export const FORM_PAGES: readonly PageConfig[] = [
             key: "favourite_beauty_products",
             label: "Her favourite beauty products",
             type: "longText",
-            required: true,
-            minLength: 2,
+            required: false,
             maxLength: 800,
             placeholder: "Blush, highlighter, setting spray, brow gel — her holy grail edit...",
-            errorMessage: "Please share her favourite beauty products.",
           },
         ],
       },
@@ -846,11 +835,9 @@ export const FORM_PAGES: readonly PageConfig[] = [
             key: "favourite_brands",
             label: "Her favourite brands",
             type: "longText",
-            required: true,
-            minLength: 2,
+            required: false,
             maxLength: 500,
             placeholder: "Fashion houses, local designers, jewellery labels, or high-street staples...",
-            errorMessage: "Please share her favourite brands.",
           },
           {
             key: "goto_outfit_essential",
@@ -982,27 +969,13 @@ export const FORM_PAGES: readonly PageConfig[] = [
             helpText: "First meeting, trips, birthdays, hard times and more",
             subFields: [
               {
-                key: "date",
-                label: "Date",
-                placeholder: "e.g. June 2019",
-                maxLength: 60,
-              },
-              {
-                key: "place",
-                label: "Place",
-                placeholder: "e.g. Nairobi / Zanzibar",
-                maxLength: 100,
-              },
-              {
                 key: "what_happened",
                 label: "What happened",
-                placeholder: "Tell the story of this memory...",
-                maxLength: 300,
-                type: "longText",
+                placeholder: "e.g. Getting lost in Old Town Zanzibar and finding the best gelato",
+                maxLength: 200,
               },
             ],
-            errorMessage:
-              "Please share at least 3 key moments (including date, place, and what happened).",
+            errorMessage: "Please share at least 3 key moments.",
           },
         ],
       },
@@ -1061,21 +1034,51 @@ export const FORM_PAGES: readonly PageConfig[] = [
     subtitle: "Her photo spreads",
     groups: [
       {
-        id: "upload",
-        title: "Upload",
+        id: "solo-photos",
+        title: "Photos of her only",
+        description:
+          "Solo portraits, selfies, candids, and full looks of her alone. Send 15 to 30 clear photos. One will be chosen as the cover.",
         fields: [
           {
-            key: "photos",
-            label: "Magazine photos",
+            key: "solo_photos",
+            label: "Photos of her only",
             type: "photoUpload",
+            category: "solo",
             required: true,
-            minPhotos: PHOTO_UPLOAD_CONFIG.minFiles,
-            maxPhotos: PHOTO_UPLOAD_CONFIG.maxFiles,
+            minPhotos: PHOTO_UPLOAD_CONFIG.soloMinFiles,
+            maxPhotos: PHOTO_UPLOAD_CONFIG.soloMaxFiles,
             maxSizeBytes: PHOTO_UPLOAD_CONFIG.maxFileSizeBytes,
             helpText:
-              "Send 15 to 30 clear photos of her: selfies, candids, group shots, trips. Send as many as you have. Clear, high quality photos make the best pages.",
-            errorMessage: PHOTO_UPLOAD_CONFIG.friendlyMinMessage,
+              "Clear, high-quality solo photos of her alone make the best cover and feature spreads.",
+            errorMessage: PHOTO_UPLOAD_CONFIG.friendlyMinMessageSolo,
           },
+        ],
+      },
+      {
+        id: "shared-photos",
+        title: "Shared photos with others",
+        description:
+          "Photos of her together with family, partner, friends, or loved ones for memories and letters spreads.",
+        fields: [
+          {
+            key: "shared_photos",
+            label: "Shared photos with others",
+            type: "photoUpload",
+            category: "shared",
+            required: true,
+            minPhotos: PHOTO_UPLOAD_CONFIG.sharedMinFiles,
+            maxPhotos: PHOTO_UPLOAD_CONFIG.sharedMaxFiles,
+            maxSizeBytes: PHOTO_UPLOAD_CONFIG.maxFileSizeBytes,
+            helpText:
+              "Photos of her together with other people: partner, family, or friends. (Minimum 4 required, up to 30)",
+            errorMessage: PHOTO_UPLOAD_CONFIG.friendlyMinMessageShared,
+          },
+        ],
+      },
+      {
+        id: "photo-link",
+        title: "Photo link fallback",
+        fields: [
           {
             key: "photo_link_fallback",
             label: "Photo link fallback",
@@ -1109,10 +1112,10 @@ export const FORM_PAGES: readonly PageConfig[] = [
             label: "Messages from other friends or family",
             type: "repeatableRows",
             required: false,
-            initialRows: 1, // Start with 1 and allow adding up to 15
+            initialRows: 1, // Start with 1 and allow adding up to 4
             minRows: 0,
-            maxRows: 15,
-            targetHint: "Optional: include notes from up to 15 friends or family members",
+            maxRows: 4,
+            targetHint: "Optional: include notes from up to 4 friends or family members",
             subFields: [
               {
                 key: "name",
@@ -1177,6 +1180,7 @@ export const uploadedPhotoItemSchema = z.object({
   caption: z.string().max(200).default(""),
   isCover: z.boolean().default(false),
   sortOrder: z.number().int().nonnegative().default(0),
+  category: z.enum(["solo", "shared"]).default("solo"),
   previewUrl: z.string().optional(),
 });
 
