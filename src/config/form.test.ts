@@ -259,6 +259,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       favourite_flowers: "Blush peonies",
       favourite_colours: "Rose and sage",
       favourite_book: "Literary fiction",
+      favourite_accessories: "Bangles, gold jewellery",
       top_movies: [
         { title: "The Devil Wears Prada" },
         { title: "How to Lose a Guy in 10 Days" },

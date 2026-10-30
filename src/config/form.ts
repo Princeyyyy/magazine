@@ -531,12 +531,12 @@ export const FORM_PAGES: readonly PageConfig[] = [
             initialRows: 3,
             minRows: 3,
             maxRows: 10,
-            targetHint: "Start with 3 (add up to 10 little rituals or pastimes she adores)",
+            targetHint: "Start with 3 (add up to 10 short activities or hobbies, e.g. swimming, hiking — list items, not full descriptions)",
             subFields: [
               {
                 key: "activity",
                 label: "Activity she loves",
-                placeholder: "e.g. Sunday morning pilates followed by iced matcha",
+                placeholder: "e.g. Swimming, hiking, pottery",
                 maxLength: 100,
               },
             ],
@@ -630,7 +630,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
       },
       {
         id: "flowers-colours-books",
-        title: "Flowers, colours and books",
+        title: "Flowers, colours, books & accessories",
         fields: [
           {
             key: "favourite_flowers",
@@ -661,6 +661,16 @@ export const FORM_PAGES: readonly PageConfig[] = [
             maxLength: 100,
             placeholder: "e.g. Everything I Know About Love, The Seven Husbands of Evelyn Hugo",
             errorMessage: "Please share her favourite book.",
+          },
+          {
+            key: "favourite_accessories",
+            label: "Favourite accessories",
+            type: "shortText",
+            required: true,
+            minLength: 2,
+            maxLength: 100,
+            placeholder: "e.g. Bangles, gold jewellery, statement rings",
+            errorMessage: "Please share her favourite accessories.",
           },
         ],
       },
