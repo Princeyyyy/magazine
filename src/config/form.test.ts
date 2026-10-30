@@ -73,6 +73,24 @@ describe("Form Configuration & Generated Zod Schemas", () => {
     expect(adaptCopyByGender("10 things she loves doing", "Other")).toBe(
       "10 things they love doing"
     );
+    expect(adaptCopyByGender("Songs that she likes", "Male")).toBe(
+      "Songs that he likes"
+    );
+    expect(adaptCopyByGender("Songs that she likes", "Other")).toBe(
+      "Songs that they like"
+    );
+    expect(
+      adaptCopyByGender(
+        "9 things you love about her and why, short sentence each",
+        "Male"
+      )
+    ).toBe("9 things you love about him and why, short sentence each");
+    expect(
+      adaptCopyByGender(
+        "9 things you love about her and why, short sentence each",
+        "Other"
+      )
+    ).toBe("9 things you love about them and why, short sentence each");
     expect(autoCapitalizeFirst("sarah mwangi")).toBe("Sarah mwangi");
   });
 
@@ -257,6 +275,13 @@ describe("Form Configuration & Generated Zod Schemas", () => {
 
     it("passes when all favourite fields and exactly 4 movies and 4 series are filled", () => {
       const result = page3Schema.safeParse(validPage3);
+      expect(result.success).toBe(true);
+    });
+
+    it("passes when favourite_beach_or_holiday_spot is omitted because it is optional", () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { favourite_beach_or_holiday_spot, ...rest } = validPage3;
+      const result = page3Schema.safeParse(rest);
       expect(result.success).toBe(true);
     });
 

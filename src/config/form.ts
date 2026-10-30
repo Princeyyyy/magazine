@@ -121,7 +121,8 @@ export function adaptCopyByGender(
     [/\bHow does she dress\?/g, p.isPluralVerb ? "How do they dress?" : `How does ${p.subj} dress?`],
     [/\bWhat she always carries in her bag\b/g, p.isPluralVerb ? "What they always carry in their bag" : `What ${p.subj} always carries in ${p.poss} bag`],
     [/\bpieces she has her eye on\b/g, p.isPluralVerb ? "pieces they have their eye on" : `pieces ${p.subj} has ${p.poss} eye on`],
-    [/\bSongs that are her\b/g, `Songs that are ${p.obj}`],
+    [/\bSongs that she likes\b/g, p.isPluralVerb ? "Songs that they like" : `Songs that ${p.subj} likes`],
+    [/\bsongs that she plays on repeat\b/g, p.isPluralVerb ? "songs that they play on repeat" : `songs that ${p.subj} plays on repeat`],
     [/\bThe age she is turning\b/g, p.isPluralVerb ? "The age they are turning" : `The age ${p.subj} is turning`],
     [/\bWhat is she building\b/g, p.isPluralVerb ? "What are they building" : `What is ${p.subj} building`],
     [/\bthe way she lights up a room\b/g, p.isPluralVerb ? "the way they light up a room" : `the way ${p.subj} lights up a room`],
@@ -502,18 +503,21 @@ export const FORM_PAGES: readonly PageConfig[] = [
         fields: [
           {
             key: "nine_things_loved",
-            label: "9 things you love about her, one short sentence each",
+            label: "9 things you love about her and why, short sentence each",
             type: "repeatableRows",
             required: true,
             initialRows: 3, // Start by showing the minimum (3) and allow adding up to 9
             minRows: 3,
             maxRows: 9,
             targetHint: "Start with 3 (add up to 9)",
+            helpText:
+              "e.g. Her kindness, because she always makes sure everyone in the room feels seen and welcomed",
             subFields: [
               {
                 key: "sentence",
-                label: "Something you love about her",
-                placeholder: "e.g. The way she remembers everyone's coffee order",
+                label: "Something you love about her and why",
+                placeholder:
+                  "e.g. Her kindness, because she always makes everyone feel welcome",
                 maxLength: 160,
               },
             ],
@@ -606,7 +610,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
             key: "favourite_beach_or_holiday_spot",
             label: "Favourite beach or holiday spot",
             type: "shortText",
-            required: true,
+            required: false,
             minLength: 2,
             maxLength: 100,
             placeholder: "e.g. Diani Beach, Lamu, Cape Town",
@@ -911,8 +915,8 @@ export const FORM_PAGES: readonly PageConfig[] = [
     subtitle: "Her playlist page",
     groups: [
       {
-        id: "songs-that-are-her",
-        title: "Songs that are her",
+        id: "songs-that-she-likes",
+        title: "Songs that she likes",
         fields: [
           {
             key: "songs",
