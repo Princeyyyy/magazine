@@ -8,6 +8,7 @@ import {
   Star,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Image as ImageIcon,
 } from "lucide-react";
 import {
@@ -16,6 +17,11 @@ import {
   autoCapitalizeFirst,
   type UploadedPhotoItem,
 } from "@/config/form";
+import {
+  generateImageFingerprint,
+  isVisualDuplicate,
+  type ImageFingerprint,
+} from "@/lib/image-fingerprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -33,6 +39,22 @@ interface UploadingFileState {
   storageProvider?: "local" | "drive";
   uploadedBytes: number;
   localPreviewUrl?: string;
+  contentHash?: string;
+  perceptualHash?: string;
+}
+
+interface DuplicateConflictInfo {
+  fileName: string;
+  conflictName: string;
+  conflictIndex?: number;
+  reason: "identical" | "near_identical";
+}
+
+interface DuplicateNoticeState {
+  conflicts: DuplicateConflictInfo[];
+  acceptedCount: number;
+  totalUniqueNow: number;
+  minRequired: number;
 }
 
 interface PhotoUploaderProps {
@@ -96,6 +118,7 @@ export function PhotoUploader({
 
   const [queue, setQueue] = useState<UploadingFileState[]>([]);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [duplicateNotice, setDuplicateNotice] = useState<DuplicateNoticeState | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const photosRef = useRef<UploadedPhotoItem[]>(photos);
@@ -255,6 +278,8 @@ export function PhotoUploader({
             storageFileId: driveFileId,
             caption: "",
             category,
+            contentHash: item.contentHash,
+            perceptualHash: item.perceptualHash,
           }),
         });
 
@@ -273,6 +298,8 @@ export function PhotoUploader({
           ...finalData.photo,
           category,
           previewUrl: item.localPreviewUrl || finalData.photo.previewUrl,
+          contentHash: item.contentHash || finalData.photo.contentHash,
+          perceptualHash: item.perceptualHash || finalData.photo.perceptualHash,
         };
 
         updatePhotos((prev) => [...prev, finalizedPhoto]);
@@ -295,6 +322,7 @@ export function PhotoUploader({
   const handleFilesSelected = useCallback(
     async (fileList: FileList | File[]) => {
       setGlobalError(null);
+      setDuplicateNotice(null);
       const incoming = Array.from(fileList);
       if (incoming.length === 0) return;
 
@@ -307,6 +335,12 @@ export function PhotoUploader({
       }
 
       const validItems: UploadingFileState[] = [];
+      const rejectedDuplicates: DuplicateConflictInfo[] = [];
+      const approvedBatch: Array<{
+        name: string;
+        contentHash?: string;
+        perceptualHash?: string;
+      }> = [];
 
       for (const file of incoming) {
         const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
@@ -327,6 +361,90 @@ export function PhotoUploader({
           continue;
         }
 
+        // Generate visual and byte fingerprints
+        let fingerprint: ImageFingerprint | null = null;
+        try {
+          fingerprint = await generateImageFingerprint(file);
+        } catch (e) {
+          console.warn("Could not compute image fingerprint:", e);
+        }
+
+        // Check for duplicates against already uploaded photos
+        let duplicateFound = false;
+        if (fingerprint) {
+          const categoryPhotos = photosRef.current.filter((p) =>
+            isSolo ? p.category !== "shared" : p.category === "shared"
+          );
+
+          for (let idx = 0; idx < categoryPhotos.length; idx++) {
+            const existing = categoryPhotos[idx]!;
+            const isSameContent =
+              Boolean(
+                existing.contentHash &&
+                fingerprint.contentHash &&
+                existing.contentHash === fingerprint.contentHash
+              );
+            const isSameVisual =
+              Boolean(
+                existing.perceptualHash &&
+                fingerprint.perceptualHash &&
+                isVisualDuplicate(existing.perceptualHash, fingerprint.perceptualHash, 8)
+              );
+
+            if (isSameContent || isSameVisual) {
+              rejectedDuplicates.push({
+                fileName: file.name,
+                conflictName: existing.originalName,
+                conflictIndex: idx + 1,
+                reason: isSameContent ? "identical" : "near_identical",
+              });
+              duplicateFound = true;
+              break;
+            }
+          }
+
+          // Check against already approved photos in this incoming batch
+          if (!duplicateFound) {
+            for (let bIdx = 0; bIdx < approvedBatch.length; bIdx++) {
+              const approved = approvedBatch[bIdx]!;
+              const isSameContent =
+                Boolean(
+                  approved.contentHash &&
+                  fingerprint.contentHash &&
+                  approved.contentHash === fingerprint.contentHash
+                );
+              const isSameVisual =
+                Boolean(
+                  approved.perceptualHash &&
+                  fingerprint.perceptualHash &&
+                  isVisualDuplicate(approved.perceptualHash, fingerprint.perceptualHash, 8)
+                );
+
+              if (isSameContent || isSameVisual) {
+                rejectedDuplicates.push({
+                  fileName: file.name,
+                  conflictName: approved.name,
+                  reason: isSameContent ? "identical" : "near_identical",
+                });
+                duplicateFound = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (duplicateFound) {
+          continue;
+        }
+
+        if (fingerprint) {
+          approvedBatch.push({
+            name: file.name,
+            contentHash: fingerprint.contentHash,
+            perceptualHash: fingerprint.perceptualHash,
+          });
+        }
+
         const localPreviewUrl = await createClientPreviewUrl(file);
         validItems.push({
           tempId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -337,6 +455,17 @@ export function PhotoUploader({
           status: "uploading",
           uploadedBytes: 0,
           localPreviewUrl,
+          contentHash: fingerprint?.contentHash,
+          perceptualHash: fingerprint?.perceptualHash,
+        });
+      }
+
+      if (rejectedDuplicates.length > 0) {
+        setDuplicateNotice({
+          conflicts: rejectedDuplicates,
+          acceptedCount: validItems.length,
+          totalUniqueNow: photosRef.current.length + validItems.length,
+          minRequired,
         });
       }
 
@@ -349,7 +478,7 @@ export function PhotoUploader({
         await uploadSingleFile(item);
       }
     },
-    [isSolo, maxAllowed, queue.length, uploadSingleFile]
+    [isSolo, maxAllowed, queue.length, uploadSingleFile, minRequired]
   );
 
   const handleSetCover = async (photoId: string) => {
@@ -449,6 +578,70 @@ export function PhotoUploader({
           />
         </div>
       </div>
+
+      {/* Duplicate Photo Detailed Alert */}
+      {duplicateNotice && (
+        <div className="rounded-2xl border border-[#F2C9D8] bg-[#FFF8F6] p-4 sm:p-5 shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-[#9E4765]/10 p-2 text-[#9E4765] shrink-0 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-serif font-medium text-base text-[#1F1619]">
+                  {duplicateNotice.conflicts.length === 1
+                    ? "Duplicate photo was not added"
+                    : `${duplicateNotice.conflicts.length} duplicate photos were not added`}
+                </h4>
+                <p className="text-xs text-[#7A686E]">
+                  To create a diverse, high-end editorial keepsake, every photo in this chapter must be a distinct image.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDuplicateNotice(null)}
+              className="text-[#7A686E] hover:text-[#1F1619] p-1 rounded-lg hover:bg-[#9E4765]/5 transition-colors"
+              aria-label="Dismiss notice"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="bg-white/90 rounded-xl border border-[#F2C9D8]/60 p-3 space-y-2">
+            <p className="text-xs font-semibold text-[#873954]">
+              Which photos have issues:
+            </p>
+            <ul className="space-y-1.5 text-xs text-[#523E45]">
+              {duplicateNotice.conflicts.map((c, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-[#9E4765] font-bold mt-0.5">•</span>
+                  <span>
+                    <span className="font-semibold text-[#1F1619]">&ldquo;{c.fileName}&rdquo;</span>{" "}
+                    {c.reason === "identical" ? (
+                      <span className="text-[#9E4765] font-medium">is an exact duplicate of</span>
+                    ) : (
+                      <span className="text-[#9E4765] font-medium">is visually nearly identical to</span>
+                    )}{" "}
+                    {c.conflictIndex ? `Photo #${c.conflictIndex}` : ""}{" "}
+                    <span className="font-semibold text-[#1F1619]">&ldquo;{c.conflictName}&rdquo;</span>.
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs text-[#6E5A61] border-t border-[#F2C9D8]/50">
+            <div>
+              <span className="font-semibold text-[#1F1619]">What to do:</span>{" "}
+              Please choose different photos showcasing unique moments, outfits, or settings.
+            </div>
+            <div className="font-medium text-[#9E4765] shrink-0">
+              {duplicateNotice.totalUniqueNow} of {duplicateNotice.minRequired} unique photos
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Drag and Drop Zone */}
       <div

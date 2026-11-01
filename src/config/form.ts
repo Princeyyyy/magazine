@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
+import { isVisualDuplicate } from "@/lib/image-fingerprint";
 
 // ============================================================================
 // PHOTO UPLOAD CONSTANTS
@@ -1196,6 +1197,8 @@ export const uploadedPhotoItemSchema = z.object({
   sortOrder: z.number().int().nonnegative().default(0),
   category: z.enum(["solo", "shared"]).default("solo"),
   previewUrl: z.string().optional(),
+  contentHash: z.string().optional(),
+  perceptualHash: z.string().optional(),
 });
 
 export type UploadedPhotoItem = z.infer<typeof uploadedPhotoItemSchema>;
@@ -1501,11 +1504,77 @@ export function buildFieldZodSchema(field: FieldConfig): z.ZodTypeAny {
         .array(uploadedPhotoItemSchema)
         .default([])
         .superRefine((items, ctx) => {
-          if (field.required && items.length < field.minPhotos) {
+          // Identify duplicate photos within items
+          const duplicatePairs: Array<{ first: string; second: string; reason: string }> = [];
+          for (let i = 0; i < items.length; i++) {
+            for (let j = i + 1; j < items.length; j++) {
+              const a = items[i];
+              const b = items[j];
+              if (!a || !b) continue;
+
+              const isSameId = a.storageFileId === b.storageFileId;
+              const isSameContent =
+                Boolean(a.contentHash && b.contentHash && a.contentHash === b.contentHash);
+              const isVisDuplicate =
+                Boolean(
+                  a.perceptualHash &&
+                  b.perceptualHash &&
+                  isVisualDuplicate(a.perceptualHash, b.perceptualHash, 8)
+                );
+
+              if (isSameId || isSameContent) {
+                duplicatePairs.push({
+                  first: a.originalName,
+                  second: b.originalName,
+                  reason: "exact duplicate",
+                });
+              } else if (isVisDuplicate) {
+                duplicatePairs.push({
+                  first: a.originalName,
+                  second: b.originalName,
+                  reason: "visually near-identical",
+                });
+              }
+            }
+          }
+
+          if (duplicatePairs.length > 0) {
+            const pairDescriptions = duplicatePairs
+              .slice(0, 3)
+              .map((p) => `"${p.second}" is a duplicate of "${p.first}" (${p.reason})`)
+              .join("; ");
+            const extraCount =
+              duplicatePairs.length > 3
+                ? ` and ${duplicatePairs.length - 3} more`
+                : "";
+
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Duplicate photos detected: ${pairDescriptions}${extraCount}. Every photo in her keepsake must be a unique image. Please remove the duplicate photos.`,
+            });
+          }
+
+          // Count unique items
+          const uniqueItems: typeof items = [];
+          for (const item of items) {
+            const isDup = uniqueItems.some((u) => {
+              if (item.storageFileId === u.storageFileId) return true;
+              if (item.contentHash && u.contentHash && item.contentHash === u.contentHash) return true;
+              if (item.perceptualHash && u.perceptualHash && isVisualDuplicate(item.perceptualHash, u.perceptualHash, 8)) return true;
+              return false;
+            });
+            if (!isDup) {
+              uniqueItems.push(item);
+            }
+          }
+
+          if (field.required && uniqueItems.length < field.minPhotos) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               message:
-                field.errorMessage ?? PHOTO_UPLOAD_CONFIG.friendlyMinMessage,
+                duplicatePairs.length > 0
+                  ? `Please upload at least ${field.minPhotos} unique photos. You currently have ${uniqueItems.length} unique photos (${items.length - uniqueItems.length} duplicate photos detected).`
+                  : (field.errorMessage ?? PHOTO_UPLOAD_CONFIG.friendlyMinMessage),
             });
           }
           if (items.length > field.maxPhotos) {

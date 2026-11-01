@@ -153,6 +153,8 @@ export async function getDraftByToken(
     isCover: p.isCover,
     sortOrder: p.sortOrder,
     category: (p.category === "shared" ? "shared" : "solo") as "solo" | "shared",
+    contentHash: p.contentHash ?? undefined,
+    perceptualHash: p.perceptualHash ?? undefined,
     previewUrl: buildPhotoPreviewUrl(p.id, order.id),
   }));
 

@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS "photos" (
 );
 
 ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "category" text DEFAULT 'solo' NOT NULL;
+ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "content_hash" text;
+ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "perceptual_hash" text;
 
 CREATE TABLE IF NOT EXISTS "dev_outbox" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

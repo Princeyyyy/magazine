@@ -419,6 +419,64 @@ describe("Form Configuration & Generated Zod Schemas", () => {
 
       expect(result.success).toBe(false);
     });
+
+    it("detects exact duplicate photos, names the conflicting images, and explains what to do", () => {
+      const soloPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "solo"));
+      // Duplicate photo 0 as photo 14 with the same storageFileId
+      soloPhotos[14] = {
+        ...soloPhotos[0]!,
+        id: "duplicate-photo-id",
+        originalName: "img-solo-0-copy.jpg",
+      };
+
+      const sharedPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "shared"));
+      const result = page8Schema.safeParse({
+        solo_photos: soloPhotos,
+        shared_photos: sharedPhotos,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const errorMessages = result.error.issues.map((i) => i.message);
+        const dupMessage = errorMessages.find((m) => m.includes("Duplicate photos detected"));
+        expect(dupMessage).toBeDefined();
+        expect(dupMessage).toContain("img-solo-0-copy.jpg");
+        expect(dupMessage).toContain("img-solo-0.jpg");
+        expect(dupMessage).toContain("Every photo in her keepsake must be a unique image");
+      }
+    });
+
+    it("detects visual near-duplicate photos based on perceptual hash similarity", () => {
+      const soloPhotos = Array.from({ length: 15 }, (_, i) => {
+        const photo = makeMockPhoto(i, "solo");
+        return {
+          ...photo,
+          perceptualHash: `hash-${i}`.padEnd(32, "0"),
+        };
+      });
+
+      // Give photo 14 a near-identical perceptual hash to photo 0 (distance < 8)
+      soloPhotos[0]!.perceptualHash = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+      soloPhotos[14]!.perceptualHash = "a1b2c3d4e5f6071f293a4b5c6d7e8f90"; // 3 bits difference
+      soloPhotos[14]!.originalName = "burst-shot-2.jpg";
+      soloPhotos[0]!.originalName = "burst-shot-1.jpg";
+
+      const sharedPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "shared"));
+      const result = page8Schema.safeParse({
+        solo_photos: soloPhotos,
+        shared_photos: sharedPhotos,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const errorMessages = result.error.issues.map((i) => i.message);
+        const dupMessage = errorMessages.find((m) => m.includes("Duplicate photos detected"));
+        expect(dupMessage).toBeDefined();
+        expect(dupMessage).toContain("burst-shot-2.jpg");
+        expect(dupMessage).toContain("burst-shot-1.jpg");
+        expect(dupMessage).toContain("visually near-identical");
+      }
+    });
   });
 
   describe("Phone Normalisation & Page 9 (Messages Optionality)", () => {

@@ -72,6 +72,8 @@ export const photos = pgTable("photos", {
   isCover: boolean("is_cover").default(false).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   category: text("category").default("solo").notNull(), // 'solo' | 'shared'
+  contentHash: text("content_hash"),
+  perceptualHash: text("perceptual_hash"),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

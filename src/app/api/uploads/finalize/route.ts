@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import crypto from "crypto";
+import { eq } from "drizzle-orm";
 import { db, ensureDbReady } from "@/db";
 import { orders, photos } from "@/db/schema";
 import { getPhotoStorage, getLocalDiskStorage } from "@/lib/services/photo-storage";
@@ -7,6 +8,7 @@ import { validatePhotoMagicBytes } from "@/lib/security";
 import { buildPhotoPreviewUrl } from "@/lib/orders";
 import { handleApiError } from "@/lib/api-response";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { isVisualDuplicate } from "@/lib/image-fingerprint";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +18,8 @@ export async function POST(req: NextRequest) {
       storageFileId?: string;
       caption?: string;
       category?: "solo" | "shared";
+      contentHash?: string;
+      perceptualHash?: string;
     };
 
     if (!body.draftToken || !body.sessionId) {
@@ -40,6 +44,8 @@ export async function POST(req: NextRequest) {
 
     // If stored locally, verify magic bytes on disk to prevent spoofed file extensions
     let verifiedMime = finalized.mime;
+    let finalContentHash = body.contentHash;
+
     if (finalized.storageProvider === "local") {
       const local = getLocalDiskStorage();
       const fileData = await local.getFile(finalized.storageFileId, order.id);
@@ -53,22 +59,52 @@ export async function POST(req: NextRequest) {
         throw new ValidationError(magicCheck.error);
       }
       verifiedMime = magicCheck.detectedMime;
+      finalContentHash = crypto.createHash("sha256").update(fileData.buffer).digest("hex");
+    }
+
+    // Check for duplicate photos against already uploaded photos for this order
+    const existingPhotos = await db.query.photos.findMany({
+      where: eq(photos.orderId, order.id),
+    });
+
+    for (let i = 0; i < existingPhotos.length; i++) {
+      const existing = existingPhotos[i]!;
+      const isExactDuplicate =
+        finalContentHash &&
+        existing.contentHash &&
+        finalContentHash === existing.contentHash;
+
+      const isVisDuplicate =
+        body.perceptualHash &&
+        existing.perceptualHash &&
+        isVisualDuplicate(body.perceptualHash, existing.perceptualHash, 8);
+
+      if (isExactDuplicate || isVisDuplicate) {
+        if (finalized.storageProvider === "local") {
+          const local = getLocalDiskStorage();
+          await local.deleteFile(finalized.storageFileId, order.id).catch(() => {});
+        }
+        return NextResponse.json(
+          {
+            error: {
+              code: "DUPLICATE_PHOTO",
+              message: `"${finalized.originalName}" is ${
+                isExactDuplicate ? "an exact duplicate of" : "visually nearly identical to"
+              } Photo ${i + 1} ("${existing.originalName}"). Each photo in your keepsake must be a unique image.`,
+              conflictingPhoto: existing.originalName,
+              conflictingIndex: i + 1,
+            },
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const category = body.category === "shared" ? "shared" : "solo";
 
     // Determine sort order & whether this is the first solo photo (default to cover)
-    const existingCountRes = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(photos)
-      .where(eq(photos.orderId, order.id));
-    const existingCount = existingCountRes[0]?.count ?? 0;
-
-    const existingCoverRes = await db
-      .select({ id: photos.id })
-      .from(photos)
-      .where(sql`${photos.orderId} = ${order.id} AND ${photos.isCover} = true`);
-    const hasCover = existingCoverRes.length > 0;
+    const existingCount = existingPhotos.length;
+    const hasCover = existingPhotos.some((p) => p.isCover);
     const isCover = category === "solo" && !hasCover;
 
     const [inserted] = await db
@@ -84,6 +120,8 @@ export async function POST(req: NextRequest) {
         isCover,
         sortOrder: existingCount,
         category,
+        contentHash: finalContentHash ?? null,
+        perceptualHash: body.perceptualHash ?? null,
       })
       .returning();
 
@@ -108,6 +146,8 @@ export async function POST(req: NextRequest) {
         isCover: inserted.isCover,
         sortOrder: inserted.sortOrder,
         category: inserted.category as "solo" | "shared",
+        contentHash: inserted.contentHash ?? undefined,
+        perceptualHash: inserted.perceptualHash ?? undefined,
         previewUrl: buildPhotoPreviewUrl(inserted.id, order.id),
       },
     });
