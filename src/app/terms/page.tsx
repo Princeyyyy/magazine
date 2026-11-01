@@ -124,6 +124,10 @@ export default function TermsOfServicePage() {
             <Link href="/terms" className="text-[#9E4765] font-medium">
               Terms of Service
             </Link>
+            <span>&bull;</span>
+            <Link href="/admin" className="hover:text-[#9E4765] transition-colors">
+              Editorial Desk
+            </Link>
           </div>
         </div>
       </footer>

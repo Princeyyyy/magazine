@@ -144,6 +144,10 @@ export default function PrivacyPolicyPage() {
             <Link href="/terms" className="hover:text-[#9E4765] transition-colors">
               Terms of Service
             </Link>
+            <span>&bull;</span>
+            <Link href="/admin" className="hover:text-[#9E4765] transition-colors">
+              Editorial Desk
+            </Link>
           </div>
         </div>
       </footer>
