@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertCircle, Play } from "lucide-react";
+import { CheckCircle2, AlertCircle, Play, Loader2 } from "lucide-react";
 
 interface ServiceModeSummary {
   isDevMode: boolean;
@@ -174,7 +174,11 @@ export function AdminSettingsClient({
                     disabled={result?.loading}
                     onClick={() => void runServiceTest(svc.id)}
                   >
-                    <Play className="h-3 w-3" />
+                    {result?.loading ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-[#9E4765]" />
+                    ) : (
+                      <Play className="h-3 w-3" />
+                    )}
                     {result?.loading ? "Testing..." : "Test"}
                   </Button>
                 </div>

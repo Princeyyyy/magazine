@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ThankYouView } from "@/components/wizard/thank-you-view";
 import { BrandLogoMark } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 interface ThankYouPageProps {
   searchParams: Promise<{
@@ -30,7 +31,10 @@ export default function ThankYouPage(props: ThankYouPageProps) {
             className="flex items-center gap-3 font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal"
           >
             <BrandLogoMark className="h-9 w-9 shrink-0" />
-            <span>Custom Magazine</span>
+            <div className="flex flex-col">
+              <span>Custom Magazine</span>
+              <BoboStudioTag variant="masthead" />
+            </div>
           </Link>
         </div>
       </header>
@@ -46,6 +50,15 @@ export default function ThankYouPage(props: ThankYouPageProps) {
           <ThankYouContent searchParams={props.searchParams} />
         </Suspense>
       </main>
+
+      <footer className="border-t border-[#EFE6E0]/80 bg-white/60 py-6 px-4 sm:px-6 text-center text-xs text-[#8C7A80]">
+        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="font-serif italic text-sm text-[#6E5A61]">
+            Custom Magazine &mdash; One-of-a-kind glossy keepsakes crafted from your memories.
+          </p>
+          <BoboStudioTag variant="footer" />
+        </div>
+      </footer>
     </div>
   );
 }

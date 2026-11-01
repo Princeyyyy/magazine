@@ -1,5 +1,4 @@
 import React from "react";
-import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { eq, asc, desc } from "drizzle-orm";
 import { getAuthenticatedAdminEmail } from "@/auth";
@@ -8,7 +7,7 @@ import { orders, answers, photos, statusHistory } from "@/db/schema";
 import { FORM_PAGES, getDefaultFormValues } from "@/config/form";
 import { getPhotoStorage } from "@/lib/services/photo-storage";
 import { AdminOrderDetailClient } from "@/components/admin/admin-order-detail-client";
-import { ChevronLeft } from "lucide-react";
+import { AdminBackToQueueButton } from "@/components/admin/admin-nav-actions";
 
 interface AdminOrderDetailPageProps {
   params: Promise<{ orderId: string }>;
@@ -91,13 +90,7 @@ export default async function AdminOrderDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          href="/admin"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[#7A686E] hover:text-[#9E4765] transition-colors"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" />
-          Back to Orders Queue
-        </Link>
+        <AdminBackToQueueButton />
       </div>
 
       <AdminOrderDetailClient

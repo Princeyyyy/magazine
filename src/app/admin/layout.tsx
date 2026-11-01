@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getAuthenticatedAdminEmail, isSuperAdminEmail } from "@/auth";
 import { AdminSignOutButton } from "@/components/admin/admin-signout-button";
 import { BrandLogoMark } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 export default async function AdminLayout({
   children,
@@ -22,10 +23,15 @@ export default async function AdminLayout({
               className="flex items-center gap-3 font-serif text-2xl tracking-tight text-[#1F1619]"
             >
               <BrandLogoMark className="h-8 w-8 shrink-0" />
-              <span>Custom Magazine</span>
-              <span className="ml-1 font-sans text-xs uppercase tracking-widest text-[#9E4765]">
-                Editorial Desk
-              </span>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span>Custom Magazine</span>
+                  <span className="font-sans text-xs uppercase tracking-widest text-[#9E4765]">
+                    Editorial Desk
+                  </span>
+                </div>
+                <BoboStudioTag variant="masthead" />
+              </div>
             </Link>
           </div>
 
@@ -64,6 +70,21 @@ export default async function AdminLayout({
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-8">
         {children}
       </main>
+
+      <footer className="border-t border-[#EFE6E0] bg-white/70 py-5 px-4 sm:px-6 text-xs text-[#8C7A80]">
+        <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="font-serif italic text-sm text-[#6E5A61]">
+            Custom Magazine &mdash; Editorial Production Desk
+          </p>
+          <div className="flex items-center gap-4">
+            <BoboStudioTag variant="footer" />
+            <span className="text-[#E6DAD3]">&bull;</span>
+            <Link href="/" className="hover:text-[#9E4765] transition-colors">
+              Customer Form
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

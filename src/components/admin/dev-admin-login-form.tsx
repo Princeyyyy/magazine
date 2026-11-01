@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Lock } from "lucide-react";
+import { Eye, EyeOff, Lock, Loader2 } from "lucide-react";
 
 export function DevAdminLoginForm({ defaultEmail }: { defaultEmail: string }) {
   const router = useRouter();
@@ -92,7 +92,11 @@ export function DevAdminLoginForm({ defaultEmail }: { defaultEmail: string }) {
       )}
 
       <Button type="submit" size="lg" className="w-full" disabled={loading}>
-        <Lock className="h-4 w-4" />
+        {loading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Lock className="h-4 w-4" />
+        )}
         {loading ? "Signing in..." : "Sign In to Editorial Desk"}
       </Button>
     </form>

@@ -6,6 +6,7 @@ import {
   BrandLogoMark,
   BrandLogoTransparent,
 } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 export default async function HomePage() {
   const adminEmail = await getAuthenticatedAdminEmail();
@@ -27,7 +28,10 @@ export default async function HomePage() {
             className="flex items-center gap-3 font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal"
           >
             <BrandLogoMark className="h-9 w-9 shrink-0" />
-            <span>Custom Magazine</span>
+            <div className="flex flex-col">
+              <span>Custom Magazine</span>
+              <BoboStudioTag variant="masthead" />
+            </div>
           </Link>
 
           <div className="flex items-center gap-3 text-xs text-[#7A686E]">
@@ -68,14 +72,16 @@ export default async function HomePage() {
 
       {/* Editorial Footer */}
       <footer className="border-t border-[#EFE6E0]/80 bg-white/60 py-6 px-4 sm:px-6 text-center text-xs text-[#8C7A80]">
-        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center justify-center gap-2">
             <BrandLogoTransparent className="h-6 w-6 shrink-0" />
             <p className="font-serif italic text-sm text-[#6E5A61]">
               Custom Magazine &mdash; One-of-a-kind glossy keepsakes crafted from your memories.
             </p>
           </div>
-          <div className="flex items-center gap-4 text-xs text-[#7A686E]">
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-[#7A686E]">
+            <BoboStudioTag variant="footer" />
+            <span className="text-[#E6DAD3]">&bull;</span>
             <Link
               href="/privacy"
               className="hover:text-[#9E4765] transition-colors"

@@ -27,6 +27,7 @@ import {
   getSectionIcon,
   BrandLogoMark,
 } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 import {
   Check,
   ChevronLeft,
@@ -1350,8 +1351,8 @@ export function MagazineWizard({
           />
         </div>
 
-        {/* Interactive Section Navigation Bar (Single Line on Desktop) */}
-        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-1 pt-1">
+        {/* Interactive Section Navigation Bar (3x3 Grid on Mobile, Single Line on Desktop) */}
+        <div className="grid grid-cols-3 gap-2 lg:flex lg:flex-nowrap lg:items-center lg:justify-between lg:gap-1 pt-1">
           {FORM_PAGES.map((p, idx) => {
             const isCurrent = idx === currentStep;
             const isUnlocked = isDevMode || isAdmin || idx <= highestUnlockedStep;
@@ -1367,33 +1368,59 @@ export function MagazineWizard({
                 onClick={() => handleJumpToStep(idx)}
                 title={`${p.pageNumber}. ${adaptedTitle}`}
                 className={cn(
-                  "flex items-center gap-1 rounded-full px-2 py-1 text-[11px] whitespace-nowrap transition-all",
+                  "group relative flex flex-col justify-between p-2 sm:p-2.5 rounded-xl border text-left min-h-[64px] transition-all",
+                  "lg:min-h-0 lg:flex-row lg:items-center lg:justify-start lg:gap-1 lg:rounded-full lg:px-2 lg:py-1 lg:border-0 lg:whitespace-nowrap lg:text-[11px]",
                   isCurrent
-                    ? "bg-[#1F1619] text-white font-semibold shadow-2xs"
+                    ? "bg-[#1F1619] text-white border-[#1F1619] shadow-2xs font-medium"
                     : isUnlocked
-                      ? "text-[#7A2E48] hover:bg-[#F6EBF0] cursor-pointer"
-                      : "text-[#C2B2B8] cursor-not-allowed"
+                      ? "bg-[#FAF7F5]/80 text-[#5C4950] border-[#EAE0DA] hover:border-[#9E4765]/40 hover:bg-white cursor-pointer lg:bg-transparent lg:border-0 lg:text-[#7A2E48] lg:hover:bg-[#F6EBF0]"
+                      : "bg-[#FBF9F7]/40 text-[#C2B2B8] border-dashed border-[#EFE8E3] cursor-not-allowed lg:bg-transparent lg:border-0 lg:text-[#C2B2B8]"
                 )}
               >
+                <div className="flex items-center justify-between w-full lg:w-auto lg:shrink-0">
+                  <span
+                    className={cn(
+                      "flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full transition-all",
+                      isCurrent
+                        ? "bg-white/20 text-white"
+                        : isCompleted
+                          ? "bg-[#F6EBF0] text-[#9E4765]"
+                          : isUnlocked
+                            ? "bg-[#F2EAE4] text-[#5C4950]"
+                            : "bg-[#F5EFEA] text-[#B5A3A9]"
+                    )}
+                  >
+                    {isCompleted && !isCurrent ? (
+                      <Check className="h-2.5 w-2.5 stroke-[2.5]" />
+                    ) : (
+                      <SectionIcon className="h-3 w-3" />
+                    )}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[9px] font-mono tracking-wider lg:hidden",
+                      isCurrent
+                        ? "text-white/60"
+                        : isCompleted
+                          ? "text-[#9E4765]/70"
+                          : "text-[#B5A3A9]"
+                    )}
+                  >
+                    0{p.pageNumber}
+                  </span>
+                </div>
                 <span
                   className={cn(
-                    "flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full transition-all",
+                    "text-[11px] font-medium leading-tight line-clamp-2 mt-1 lg:mt-0 lg:line-clamp-none lg:truncate",
                     isCurrent
-                      ? "bg-white/20 text-white"
-                      : isCompleted
-                        ? "bg-[#F6EBF0] text-[#9E4765]"
-                        : isUnlocked
-                          ? "bg-[#F2EAE4] text-[#5C4950]"
-                          : "bg-[#F5EFEA] text-[#B5A3A9]"
+                      ? "text-white"
+                      : isUnlocked
+                        ? "text-[#2B1F24] group-hover:text-[#9E4765] lg:text-inherit"
+                        : "text-[#B5A3A9]"
                   )}
                 >
-                  {isCompleted && !isCurrent ? (
-                    <Check className="h-2.5 w-2.5" />
-                  ) : (
-                    <SectionIcon className="h-3 w-3" />
-                  )}
+                  {adaptedTitle}
                 </span>
-                <span>{adaptedTitle}</span>
               </button>
             );
           })}
@@ -1404,12 +1431,14 @@ export function MagazineWizard({
               type="button"
               onClick={() => handleJumpToStep(totalSteps)}
               className={cn(
-                "flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] whitespace-nowrap transition-all cursor-pointer",
+                "col-span-3 flex items-center justify-center gap-1.5 rounded-xl py-2 px-3 text-xs font-medium border transition-all cursor-pointer",
+                "lg:col-auto lg:rounded-full lg:px-2.5 lg:py-1 lg:text-[11px] lg:border-0 lg:whitespace-nowrap",
                 isReviewStep
-                  ? "bg-[#1F1619] text-white font-semibold"
-                  : "text-[#7A2E48] hover:bg-[#F6EBF0]"
+                  ? "bg-[#1F1619] text-white font-semibold border-[#1F1619] shadow-2xs"
+                  : "bg-[#FAF7F5]/80 text-[#7A2E48] border-[#EAE0DA] hover:bg-[#F6EBF0] lg:bg-transparent lg:border-0"
               )}
             >
+              <Sparkles className="h-3 w-3 shrink-0" />
               <span>Review</span>
             </button>
           )}
@@ -1686,6 +1715,11 @@ export function MagazineWizard({
                 </>
               )}
             </Button>
+          </div>
+
+          {/* Luxury Imprint */}
+          <div className="pt-6 border-t border-[#F3ECE7]">
+            <BoboStudioTag variant="seal" />
           </div>
         </form>
       ) : null}

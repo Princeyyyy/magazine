@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { EditorialSelect } from "@/components/ui/editorial-select";
 import { getSectionIcon } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 import {
   generateOrderWordBlob,
   generateOrderPdfBlob,
@@ -1214,6 +1215,10 @@ export function AdminOrderDetailClient({
             )}
           </section>
         </div>
+      </div>
+      {/* Luxury Imprint */}
+      <div className="pt-6 border-t border-[#F3ECE7]">
+        <BoboStudioTag variant="seal" />
       </div>
     </div>
   );

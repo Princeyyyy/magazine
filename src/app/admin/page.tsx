@@ -14,11 +14,17 @@ import {
   ArrowUpRight,
   Search,
   ExternalLink,
-  ChevronLeft,
-  ChevronRight,
   BookOpen,
-  RotateCcw,
 } from "lucide-react";
+import {
+  AdminOpenBriefButton,
+  AdminOrderRefLink,
+  AdminConfigureServicesButton,
+  AdminFilterForm,
+  AdminFilterSubmitButton,
+  AdminResetFiltersButton,
+  AdminPaginationNav,
+} from "@/components/admin/admin-nav-actions";
 
 const PAGE_SIZE = 10;
 
@@ -163,83 +169,73 @@ export default async function AdminOrdersPage({
           </h1>
         </div>
 
-        {isSuperAdmin && (
-          <Button asChild variant="outline" size="sm">
-            <Link href="/admin/settings">Configure Services</Link>
-          </Button>
-        )}
+        {isSuperAdmin && <AdminConfigureServicesButton />}
       </div>
 
       {/* Search & Filter Bar */}
-      <form
-        method="GET"
-        action="/admin"
-        className="rounded-2xl border border-[#EFE6E0] bg-white p-4 sm:p-5 shadow-2xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center"
-      >
-        <div className="relative sm:col-span-2 lg:col-span-4 min-w-0">
-          <Search className="h-4 w-4 text-[#A39197] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <Input
-            name="q"
-            defaultValue={params.q ?? ""}
-            placeholder="Search by name, email, or reference..."
-            className="pl-10 h-10 w-full"
-          />
-        </div>
+      <AdminFilterForm>
+        {(isSubmitting) => (
+          <>
+            <div className="relative sm:col-span-2 lg:col-span-4 min-w-0">
+              <Search className="h-4 w-4 text-[#A39197] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                name="q"
+                defaultValue={params.q ?? ""}
+                placeholder="Search by name, email, or reference..."
+                className="pl-10 h-10 w-full"
+              />
+            </div>
 
-        <EditorialSelect
-          name="status"
-          defaultValue={statusFilter}
-          ariaLabel="Filter by status"
-          className="w-full min-w-0 lg:col-span-2"
-          size="md"
-          triggerClassName="text-xs"
-          options={[
-            { value: "", label: "All Statuses" },
-            ...orderStatusEnum.enumValues.map((s) => ({
-              value: s,
-              label: STATUS_BADGE_MAP[s].label,
-            })),
-          ]}
-        />
+            <EditorialSelect
+              name="status"
+              defaultValue={statusFilter}
+              ariaLabel="Filter by status"
+              className="w-full min-w-0 lg:col-span-2"
+              size="md"
+              triggerClassName="text-xs"
+              options={[
+                { value: "", label: "All Statuses" },
+                ...orderStatusEnum.enumValues.map((s) => ({
+                  value: s,
+                  label: STATUS_BADGE_MAP[s].label,
+                })),
+              ]}
+            />
 
-        <EditorialSelect
-          name="theme"
-          defaultValue={params.theme ?? ""}
-          ariaLabel="Filter by colour theme"
-          className="w-full min-w-0 lg:col-span-3"
-          size="md"
-          triggerClassName="text-xs"
-          options={[
-            { value: "", label: "All Colour Themes" },
-            { value: "pink", label: "Pink and girly" },
-            { value: "black", label: "Black and white" },
-            { value: "neutral", label: "Neutral and minimal" },
-            { value: "bright", label: "Bright and colourful" },
-            { value: "other", label: "Other" },
-          ]}
-        />
+            <EditorialSelect
+              name="theme"
+              defaultValue={params.theme ?? ""}
+              ariaLabel="Filter by colour theme"
+              className="w-full min-w-0 lg:col-span-3"
+              size="md"
+              triggerClassName="text-xs"
+              options={[
+                { value: "", label: "All Colour Themes" },
+                { value: "pink", label: "Pink and girly" },
+                { value: "black", label: "Black and white" },
+                { value: "neutral", label: "Neutral and minimal" },
+                { value: "bright", label: "Bright and colourful" },
+                { value: "other", label: "Other" },
+              ]}
+            />
 
-        <EditorialSelect
-          name="sort"
-          defaultValue={sortOrder}
-          ariaLabel="Sort by last updated"
-          className="w-full min-w-0 lg:col-span-2"
-          size="md"
-          triggerClassName="text-xs"
-          options={[
-            { value: "newest", label: "Latest Updated" },
-            { value: "oldest", label: "Oldest Updated" },
-          ]}
-        />
+            <EditorialSelect
+              name="sort"
+              defaultValue={sortOrder}
+              ariaLabel="Sort by last updated"
+              className="w-full min-w-0 lg:col-span-2"
+              size="md"
+              triggerClassName="text-xs"
+              options={[
+                { value: "newest", label: "Latest Updated" },
+                { value: "oldest", label: "Oldest Updated" },
+              ]}
+            />
 
-        <Button
-          type="submit"
-          size="sm"
-          className="h-10 w-full lg:col-span-1"
-        >
-          Filter
-        </Button>
-      </form>
+            <AdminFilterSubmitButton isSubmitting={isSubmitting} />
+          </>
+        )}
+      </AdminFilterForm>
 
       {/* Orders Table */}
       <div className="rounded-3xl border border-[#EFE6E0] bg-white overflow-hidden shadow-[0_8px_30px_-12px_rgba(31,22,25,0.05)]">
@@ -282,12 +278,7 @@ export default async function AdminOrdersPage({
                       </div>
                       <div className="pt-2 flex items-center justify-center gap-3">
                         {hasActiveFilters ? (
-                          <Button asChild variant="outline" size="sm">
-                            <Link href="/admin">
-                              <RotateCcw className="h-3.5 w-3.5" />
-                              Reset Filters
-                            </Link>
-                          </Button>
+                          <AdminResetFiltersButton />
                         ) : (
                           <Button asChild variant="outline" size="sm">
                             <Link href="/" target="_blank">
@@ -310,13 +301,11 @@ export default async function AdminOrdersPage({
                       key={order.id}
                       className="hover:bg-[#FCF9F7]/80 transition-colors"
                     >
-                      <td className="py-4 px-5 font-mono text-xs font-medium text-[#1F1619]">
-                        <Link
-                          href={`/admin/orders/${order.id}`}
-                          className="hover:text-[#9E4765] underline-offset-4 hover:underline"
-                        >
-                          {order.reference}
-                        </Link>
+                      <td className="py-4 px-5">
+                        <AdminOrderRefLink
+                          orderId={order.id}
+                          reference={order.reference}
+                        />
                       </td>
                       <td className="py-4 px-5">
                         <div className="font-serif text-base font-medium text-[#1F1619]">
@@ -390,12 +379,7 @@ export default async function AdminOrdersPage({
                         </div>
                       </td>
                       <td className="py-4 px-5 text-right">
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/admin/orders/${order.id}`}>
-                            Open Brief
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                          </Link>
-                        </Button>
+                        <AdminOpenBriefButton orderId={order.id} />
                       </td>
                     </tr>
                   );
@@ -422,62 +406,11 @@ export default async function AdminOrdersPage({
               page)
             </p>
 
-            <nav
-              aria-label="Orders pagination"
-              className="flex items-center gap-1.5"
-            >
-              {currentPage > 1 ? (
-                <Link
-                  href={buildPageUrl(params, currentPage - 1)}
-                  className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  Previous
-                </Link>
-              ) : (
-                <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  Previous
-                </span>
-              )}
-
-              <div className="flex items-center gap-1 px-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (pNum) => {
-                    const isActive = pNum === currentPage;
-                    return (
-                      <Link
-                        key={pNum}
-                        href={buildPageUrl(params, pNum)}
-                        aria-current={isActive ? "page" : undefined}
-                        className={
-                          isActive
-                            ? "inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#9E4765] text-xs font-semibold text-white shadow-2xs"
-                            : "inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#EAE0DA] bg-white text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-                        }
-                      >
-                        {pNum}
-                      </Link>
-                    );
-                  }
-                )}
-              </div>
-
-              {currentPage < totalPages ? (
-                <Link
-                  href={buildPageUrl(params, currentPage + 1)}
-                  className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors"
-                >
-                  Next
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              ) : (
-                <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
-                  Next
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </span>
-              )}
-            </nav>
+            <AdminPaginationNav
+              currentPage={currentPage}
+              totalPages={totalPages}
+              buildPageUrl={(targetPage) => buildPageUrl(params, targetPage)}
+            />
           </div>
         )}
       </div>

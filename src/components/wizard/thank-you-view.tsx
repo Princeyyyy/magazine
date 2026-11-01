@@ -3,6 +3,7 @@
 import React from "react";
 import { Check, Copy, MessageCircle } from "lucide-react";
 import { BrandLogoTransparent } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 interface ThankYouViewProps {
   reference: string;
@@ -115,6 +116,11 @@ export function ThankYouView({ reference, herName }: ThankYouViewProps) {
               </>
             )}
           </button>
+        </div>
+
+        {/* Luxury Atelier Imprint */}
+        <div className="pt-4 border-t border-[#EFE6E0]">
+          <BoboStudioTag variant="seal" />
         </div>
       </div>
     </div>

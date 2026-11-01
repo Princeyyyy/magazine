@@ -20,9 +20,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Custom Magazine — Bespoke Editorial Keepsakes",
+  title: "Custom Magazine — Product of Bobo Studio",
   description:
-    "Create a personalised, one-of-a-kind glossy magazine crafted from the stories, memories, and photos shared by someone who loves them.",
+    "Create a personalised, one-of-a-kind glossy magazine crafted from the stories, memories, and photos shared by someone who loves them. A product of Bobo Studio.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [

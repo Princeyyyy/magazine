@@ -8,6 +8,7 @@ import {
 } from "@/config/form";
 import { Button } from "@/components/ui/button";
 import { getSectionIcon } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 import { Star, Pencil, Image as ImageIcon } from "lucide-react";
 
 interface ReviewStepProps {
@@ -328,6 +329,11 @@ export function ReviewStep({
             ? "Submitting Magazine..."
             : "Submit Magazine Order"}
         </Button>
+      </div>
+
+      {/* Luxury Atelier Imprint */}
+      <div className="pt-6 border-t border-[#F3ECE7]">
+        <BoboStudioTag variant="seal" />
       </div>
     </div>
   );
