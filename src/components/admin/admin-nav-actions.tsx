@@ -3,7 +3,9 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, Loader2, RotateCcw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { EditorialSelect } from "@/components/ui/editorial-select";
+import { ArrowUpRight, Loader2, RotateCcw, Search } from "lucide-react";
 
 /**
  * Open Brief button in the admin orders table.
@@ -111,29 +113,6 @@ export function AdminConfigureServicesButton() {
 }
 
 /**
- * Filter submit button with instant loading feedback upon form submit.
- */
-export function AdminFilterSubmitButton({ isSubmitting }: { isSubmitting?: boolean }) {
-  return (
-    <Button
-      type="submit"
-      size="sm"
-      disabled={isSubmitting}
-      className="h-10 w-full lg:col-span-1 min-w-[80px]"
-    >
-      {isSubmitting ? (
-        <>
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>Filtering...</span>
-        </>
-      ) : (
-        <span>Filter</span>
-      )}
-    </Button>
-  );
-}
-
-/**
  * Reset filters button with instant loading state upon click.
  */
 export function AdminResetFiltersButton() {
@@ -161,28 +140,6 @@ export function AdminResetFiltersButton() {
       )}
       <span>{loading ? "Resetting..." : "Reset Filters"}</span>
     </Button>
-  );
-}
-
-/**
- * Client wrapper for the filter form to track submission loading state.
- */
-export function AdminFilterForm({
-  children,
-}: {
-  children: (isSubmitting: boolean) => React.ReactNode;
-}) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  return (
-    <form
-      method="GET"
-      action="/admin"
-      onSubmit={() => setIsSubmitting(true)}
-      className="rounded-2xl border border-[#EFE6E0] bg-white p-4 sm:p-5 shadow-2xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center"
-    >
-      {children(isSubmitting)}
-    </form>
   );
 }
 
@@ -216,24 +173,154 @@ export function AdminBackToQueueButton() {
   );
 }
 
+export interface AdminFilterOption {
+  value: string;
+  label: string;
+}
+
+interface AdminOrdersFilterBarProps {
+  initialQuery?: string;
+  initialStatus?: string;
+  initialTheme?: string;
+  initialSort?: string;
+  statusOptions: AdminFilterOption[];
+}
+
+/**
+ * Self-contained Client Component for the Admin Filter Bar.
+ * Strictly uses plain serializable props (strings and option objects) to prevent RSC serialization errors.
+ */
+export function AdminOrdersFilterBar({
+  initialQuery = "",
+  initialStatus = "",
+  initialTheme = "",
+  initialSort = "newest",
+  statusOptions,
+}: AdminOrdersFilterBarProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  return (
+    <form
+      method="GET"
+      action="/admin"
+      onSubmit={() => setIsSubmitting(true)}
+      className="rounded-2xl border border-[#EFE6E0] bg-white p-4 sm:p-5 shadow-2xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center"
+    >
+      <div className="relative sm:col-span-2 lg:col-span-4 min-w-0">
+        <Search className="h-4 w-4 text-[#A39197] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <Input
+          name="q"
+          defaultValue={initialQuery}
+          placeholder="Search by name, email, or reference..."
+          className="pl-10 h-10 w-full"
+        />
+      </div>
+
+      <EditorialSelect
+        name="status"
+        defaultValue={initialStatus}
+        ariaLabel="Filter by status"
+        className="w-full min-w-0 lg:col-span-2"
+        size="md"
+        triggerClassName="text-xs"
+        options={statusOptions}
+      />
+
+      <EditorialSelect
+        name="theme"
+        defaultValue={initialTheme}
+        ariaLabel="Filter by colour theme"
+        className="w-full min-w-0 lg:col-span-3"
+        size="md"
+        triggerClassName="text-xs"
+        options={[
+          { value: "", label: "All Colour Themes" },
+          { value: "pink", label: "Pink and girly" },
+          { value: "black", label: "Black and white" },
+          { value: "neutral", label: "Neutral and minimal" },
+          { value: "bright", label: "Bright and colourful" },
+          { value: "other", label: "Other" },
+        ]}
+      />
+
+      <EditorialSelect
+        name="sort"
+        defaultValue={initialSort}
+        ariaLabel="Sort by last updated"
+        className="w-full min-w-0 lg:col-span-2"
+        size="md"
+        triggerClassName="text-xs"
+        options={[
+          { value: "newest", label: "Latest Updated" },
+          { value: "oldest", label: "Oldest Updated" },
+        ]}
+      />
+
+      <Button
+        type="submit"
+        size="sm"
+        disabled={isSubmitting}
+        className="h-10 w-full lg:col-span-1 min-w-[80px]"
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Filtering...</span>
+          </>
+        ) : (
+          <span>Filter</span>
+        )}
+      </Button>
+    </form>
+  );
+}
+
+interface AdminPaginationNavProps {
+  currentPage: number;
+  totalPages: number;
+  baseParams: {
+    q?: string;
+    status?: string;
+    theme?: string;
+    sort?: string;
+  };
+}
+
+function buildPaginationUrl(
+  baseParams: { q?: string; status?: string; theme?: string; sort?: string },
+  targetPage: number
+): string {
+  const sp = new URLSearchParams();
+  if (baseParams.q) sp.set("q", baseParams.q);
+  if (baseParams.status) sp.set("status", baseParams.status);
+  if (baseParams.theme) sp.set("theme", baseParams.theme);
+  if (baseParams.sort && baseParams.sort !== "oldest") {
+    // default is newest
+  } else if (baseParams.sort) {
+    sp.set("sort", baseParams.sort);
+  }
+  if (targetPage > 1) {
+    sp.set("page", String(targetPage));
+  }
+  const qs = sp.toString();
+  return qs ? `/admin?${qs}` : "/admin";
+}
+
 /**
  * Pagination Navigation bar with instant feedback on link clicks.
+ * Strictly uses plain serializable props (numbers, plain baseParams object).
  */
 export function AdminPaginationNav({
   currentPage,
   totalPages,
-  buildPageUrl,
-}: {
-  currentPage: number;
-  totalPages: number;
-  buildPageUrl: (page: number) => string;
-}) {
+  baseParams,
+}: AdminPaginationNavProps) {
   const router = useRouter();
   const [navigatingPage, setNavigatingPage] = useState<number | null>(null);
 
   const handleNavigate = (page: number) => {
     setNavigatingPage(page);
-    router.push(buildPageUrl(page));
+    router.push(buildPaginationUrl(baseParams, page));
   };
 
   return (

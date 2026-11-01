@@ -7,12 +7,9 @@ import { db, ensureDbReady } from "@/db";
 import { orders, photos, orderStatusEnum, type OrderStatus } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { EditorialSelect } from "@/components/ui/editorial-select";
 import {
   Camera,
   ArrowUpRight,
-  Search,
   ExternalLink,
   BookOpen,
 } from "lucide-react";
@@ -20,8 +17,7 @@ import {
   AdminOpenBriefButton,
   AdminOrderRefLink,
   AdminConfigureServicesButton,
-  AdminFilterForm,
-  AdminFilterSubmitButton,
+  AdminOrdersFilterBar,
   AdminResetFiltersButton,
   AdminPaginationNav,
 } from "@/components/admin/admin-nav-actions";
@@ -51,29 +47,6 @@ const STATUS_BADGE_MAP: Record<
   delivered: { label: "Delivered", variant: "success" },
   cancelled: { label: "Cancelled", variant: "outline" },
 };
-
-function buildPageUrl(
-  baseParams: {
-    q?: string;
-    status?: string;
-    theme?: string;
-    sort?: string;
-  },
-  targetPage: number
-): string {
-  const sp = new URLSearchParams();
-  if (baseParams.q) sp.set("q", baseParams.q);
-  if (baseParams.status) sp.set("status", baseParams.status);
-  if (baseParams.theme) sp.set("theme", baseParams.theme);
-  if (baseParams.sort && baseParams.sort !== "newest") {
-    sp.set("sort", baseParams.sort);
-  }
-  if (targetPage > 1) {
-    sp.set("page", String(targetPage));
-  }
-  const qs = sp.toString();
-  return qs ? `/admin?${qs}` : "/admin";
-}
 
 export default async function AdminOrdersPage({
   searchParams,
@@ -173,69 +146,19 @@ export default async function AdminOrdersPage({
       </div>
 
       {/* Search & Filter Bar */}
-      <AdminFilterForm>
-        {(isSubmitting) => (
-          <>
-            <div className="relative sm:col-span-2 lg:col-span-4 min-w-0">
-              <Search className="h-4 w-4 text-[#A39197] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <Input
-                name="q"
-                defaultValue={params.q ?? ""}
-                placeholder="Search by name, email, or reference..."
-                className="pl-10 h-10 w-full"
-              />
-            </div>
-
-            <EditorialSelect
-              name="status"
-              defaultValue={statusFilter}
-              ariaLabel="Filter by status"
-              className="w-full min-w-0 lg:col-span-2"
-              size="md"
-              triggerClassName="text-xs"
-              options={[
-                { value: "", label: "All Statuses" },
-                ...orderStatusEnum.enumValues.map((s) => ({
-                  value: s,
-                  label: STATUS_BADGE_MAP[s].label,
-                })),
-              ]}
-            />
-
-            <EditorialSelect
-              name="theme"
-              defaultValue={params.theme ?? ""}
-              ariaLabel="Filter by colour theme"
-              className="w-full min-w-0 lg:col-span-3"
-              size="md"
-              triggerClassName="text-xs"
-              options={[
-                { value: "", label: "All Colour Themes" },
-                { value: "pink", label: "Pink and girly" },
-                { value: "black", label: "Black and white" },
-                { value: "neutral", label: "Neutral and minimal" },
-                { value: "bright", label: "Bright and colourful" },
-                { value: "other", label: "Other" },
-              ]}
-            />
-
-            <EditorialSelect
-              name="sort"
-              defaultValue={sortOrder}
-              ariaLabel="Sort by last updated"
-              className="w-full min-w-0 lg:col-span-2"
-              size="md"
-              triggerClassName="text-xs"
-              options={[
-                { value: "newest", label: "Latest Updated" },
-                { value: "oldest", label: "Oldest Updated" },
-              ]}
-            />
-
-            <AdminFilterSubmitButton isSubmitting={isSubmitting} />
-          </>
-        )}
-      </AdminFilterForm>
+      <AdminOrdersFilterBar
+        initialQuery={params.q ?? ""}
+        initialStatus={statusFilter}
+        initialTheme={params.theme ?? ""}
+        initialSort={sortOrder}
+        statusOptions={[
+          { value: "", label: "All Statuses" },
+          ...orderStatusEnum.enumValues.map((s) => ({
+            value: s,
+            label: STATUS_BADGE_MAP[s].label,
+          })),
+        ]}
+      />
 
       {/* Orders Table */}
       <div className="rounded-3xl border border-[#EFE6E0] bg-white overflow-hidden shadow-[0_8px_30px_-12px_rgba(31,22,25,0.05)]">
@@ -409,7 +332,7 @@ export default async function AdminOrdersPage({
             <AdminPaginationNav
               currentPage={currentPage}
               totalPages={totalPages}
-              buildPageUrl={(targetPage) => buildPageUrl(params, targetPage)}
+              baseParams={params}
             />
           </div>
         )}
