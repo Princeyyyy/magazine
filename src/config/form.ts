@@ -14,14 +14,14 @@ export const PHOTO_UPLOAD_CONFIG = {
   ] as const,
   soloMinFiles: 15,
   soloMaxFiles: 30,
-  sharedMinFiles: 4,
+  sharedMinFiles: 15,
   sharedMaxFiles: 30,
   minFiles: 15,
   maxFiles: 30,
   maxFileSizeBytes: 15 * 1024 * 1024, // 15 MB
   maxFileSizeMB: 15,
   friendlyMinMessageSolo: "Please upload at least 15 solo photos of her",
-  friendlyMinMessageShared: "Please upload at least 4 shared photos with others",
+  friendlyMinMessageShared: "Please upload at least 15 shared photos with others",
   friendlyMinMessage: "A few more photos will make the magazine shine",
 } as const;
 
@@ -506,10 +506,10 @@ export const FORM_PAGES: readonly PageConfig[] = [
             label: "9 things you love about her and why, short sentence each",
             type: "repeatableRows",
             required: true,
-            initialRows: 3, // Start by showing the minimum (3) and allow adding up to 9
-            minRows: 3,
+            initialRows: 9,
+            minRows: 9,
             maxRows: 9,
-            targetHint: "Start with 3 (add up to 9)",
+            targetHint: "All 9 entries required (one short sentence each with why)",
             helpText:
               "e.g. Her kindness, because she always makes sure everyone in the room feels seen and welcomed",
             subFields: [
@@ -521,17 +521,17 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 maxLength: 160,
               },
             ],
-            errorMessage: "Please fill in at least 3 things you love about her.",
+            errorMessage: "Please fill in all 9 things you love about her.",
           },
           {
             key: "ten_things_she_loves_doing",
             label: "10 things she loves doing",
             type: "repeatableRows",
             required: true,
-            initialRows: 3,
-            minRows: 3,
+            initialRows: 10,
+            minRows: 10,
             maxRows: 10,
-            targetHint: "Start with 3 (add up to 10 short activities or hobbies, e.g. swimming, hiking — list items, not full descriptions)",
+            targetHint: "All 10 short activities or hobbies required (e.g. swimming, hiking — list items, not full descriptions)",
             subFields: [
               {
                 key: "activity",
@@ -540,7 +540,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 maxLength: 100,
               },
             ],
-            errorMessage: "Please add at least 3 things she loves doing.",
+            errorMessage: "Please add all 10 things she loves doing.",
           },
         ],
       },
@@ -739,10 +739,10 @@ export const FORM_PAGES: readonly PageConfig[] = [
             label: "Her top 3 perfumes, and why",
             type: "repeatableRows",
             required: true,
-            initialRows: 1,
-            minRows: 1,
+            initialRows: 3,
+            minRows: 3,
             maxRows: 3,
-            targetHint: "1 to 3 signature scents (at least 1 required)",
+            targetHint: "All 3 signature scents and memories required",
             subFields: [
               {
                 key: "perfume_name",
@@ -757,7 +757,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 maxLength: 200,
               },
             ],
-            errorMessage: "Please share at least 1 signature perfume.",
+            errorMessage: "Please share her top 3 perfumes and why she loves them.",
           },
         ],
       },
@@ -890,10 +890,10 @@ export const FORM_PAGES: readonly PageConfig[] = [
             label: "Wishlist",
             type: "repeatableRows",
             required: true,
-            initialRows: 1,
-            minRows: 1,
-            maxRows: 10,
-            targetHint: "Target: pieces she has her eye on (at least 1 required)",
+            initialRows: 3,
+            minRows: 3,
+            maxRows: 8,
+            targetHint: "Target: 3 to 8 pieces she has her eye on (at least 3 required)",
             subFields: [
               {
                 key: "item",
@@ -908,7 +908,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 maxLength: 100,
               },
             ],
-            errorMessage: "Please add at least 1 wishlist item.",
+            errorMessage: "Please add at least 3 wishlist items.",
           },
         ],
       },
@@ -933,10 +933,10 @@ export const FORM_PAGES: readonly PageConfig[] = [
             label: "Songs",
             type: "repeatableRows",
             required: true,
-            initialRows: 3, // Start with minimum 3 and allow adding up to 8
-            minRows: 3,
+            initialRows: 5,
+            minRows: 5,
             maxRows: 8,
-            targetHint: "Target: 5 to 8 tracks (minimum 3 required)",
+            targetHint: "Target: 5 to 8 tracks (at least 5 required)",
             subFields: [
               {
                 key: "song_title",
@@ -951,7 +951,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 maxLength: 100,
               },
             ],
-            errorMessage: "Please add at least 3 songs (with both song title and artist) for her playlist page.",
+            errorMessage: "Please add at least 5 songs (with both song title and artist) for her playlist page.",
           },
         ],
       },
@@ -976,10 +976,10 @@ export const FORM_PAGES: readonly PageConfig[] = [
             label: "Key moments",
             type: "repeatableRows",
             required: true,
-            initialRows: 3, // Start with minimum 3 and allow adding up to 8
-            minRows: 3,
+            initialRows: 5,
+            minRows: 5,
             maxRows: 8,
-            targetHint: "Target: 5 to 8 memories (minimum 3 required)",
+            targetHint: "Target: 5 to 8 memories (at least 5 required)",
             helpText: "First meeting, trips, birthdays, hard times and more",
             subFields: [
               {
@@ -989,7 +989,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 maxLength: 200,
               },
             ],
-            errorMessage: "Please share at least 3 key moments.",
+            errorMessage: "Please share at least 5 key moments.",
           },
         ],
       },
@@ -1072,7 +1072,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
         id: "shared-photos",
         title: "Shared photos with others",
         description:
-          "Photos of her together with family, partner, friends, or loved ones for memories and letters spreads.",
+          "Photos of her together with family, partner, friends, or loved ones for memories and letters spreads. Send 15 to 30 clear photos.",
         fields: [
           {
             key: "shared_photos",
@@ -1084,7 +1084,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
             maxPhotos: PHOTO_UPLOAD_CONFIG.sharedMaxFiles,
             maxSizeBytes: PHOTO_UPLOAD_CONFIG.maxFileSizeBytes,
             helpText:
-              "Photos of her together with other people: partner, family, or friends. (Minimum 4 required, up to 30)",
+              "Photos of her together with other people: partner, family, or friends. (Minimum 15 required, up to 30)",
             errorMessage: PHOTO_UPLOAD_CONFIG.friendlyMinMessageShared,
           },
         ],
@@ -1462,7 +1462,10 @@ export function buildFieldZodSchema(field: FieldConfig): z.ZodTypeAny {
                   });
                 }
               });
-            } else if (field.minRows > 0 && field.minRows === field.maxRows) {
+            } else if (
+              field.minRows > 0 &&
+              (field.minRows === field.maxRows || index < field.minRows)
+            ) {
               field.subFields.forEach((sf) => {
                 ctx.addIssue({
                   code: z.ZodIssueCode.custom,

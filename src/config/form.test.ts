@@ -50,14 +50,14 @@ describe("Form Configuration & Generated Zod Schemas", () => {
     }
 
     // Check repeatable rows initial row counts (starts with minRows when minRows > 0, or 1 when optional)
-    expect(defaults["nine_things_loved"]).toHaveLength(3);
-    expect(defaults["ten_things_she_loves_doing"]).toHaveLength(3);
+    expect(defaults["nine_things_loved"]).toHaveLength(9);
+    expect(defaults["ten_things_she_loves_doing"]).toHaveLength(10);
     expect(defaults["top_movies"]).toHaveLength(4);
     expect(defaults["top_series"]).toHaveLength(4);
-    expect(defaults["top_3_perfumes"]).toHaveLength(1);
-    expect(defaults["wishlist"]).toHaveLength(1);
-    expect(defaults["songs"]).toHaveLength(3);
-    expect(defaults["key_moments"]).toHaveLength(3);
+    expect(defaults["top_3_perfumes"]).toHaveLength(3);
+    expect(defaults["wishlist"]).toHaveLength(3);
+    expect(defaults["songs"]).toHaveLength(5);
+    expect(defaults["key_moments"]).toHaveLength(5);
     expect(defaults["messages_from_loved_ones"]).toHaveLength(1);
     expect(defaults["subject_gender"]).toBe("Female");
   });
@@ -186,23 +186,35 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       what_makes_her_different: "Her radiant laughter and unmatched empathy.",
       her_job_studies_passions: "Interior design and sustainable fashion.",
       nine_things_loved: [
-        { sentence: "Her infectious laugh" },
-        { sentence: "Her generosity" },
-        { sentence: "Her impeccable taste in music" },
+        { sentence: "Her infectious laugh and how it brightens the darkest room" },
+        { sentence: "Her endless generosity and how she always puts others first" },
+        { sentence: "Her impeccable taste in music and curated playlists" },
+        { sentence: "Her honesty even when things are difficult to say" },
+        { sentence: "The way she dances around the kitchen while cooking" },
+        { sentence: "Her unwavering loyalty to the people she loves" },
+        { sentence: "How deeply she listens when you share something heavy" },
+        { sentence: "Her adventurous spirit when trying new restaurants" },
+        { sentence: "Her radiant smile whenever she sees an old friend" },
       ],
       ten_things_she_loves_doing: [
-        { activity: "Saturday pilates class" },
-        { activity: "Iced matcha lattes" },
-        { activity: "Hosting weekend dinner parties" },
+        { activity: "Saturday morning pilates class" },
+        { activity: "Sipping iced vanilla matcha lattes" },
+        { activity: "Hosting intimate weekend dinner parties" },
+        { activity: "Exploring coastal beaches and hidden coves" },
+        { activity: "Shopping for vintage jewellery" },
+        { activity: "Reading bestselling romance novels" },
+        { activity: "Listening to live afrobeat acoustic sets" },
+        { activity: "Trying out new pasta recipes from scratch" },
+        { activity: "Browsing interior decor magazines" },
+        { activity: "Walking through Sunday farmer markets" },
       ],
     };
 
-    it("fails when nine_things_loved has fewer than 3 filled rows", () => {
+    it("fails when nine_things_loved has fewer than 9 filled rows", () => {
       const result = page2Schema.safeParse({
         ...validPage2Base,
         nine_things_loved: [
-          { sentence: "Her infectious laugh" },
-          { sentence: "Her generosity" },
+          ...validPage2Base.nine_things_loved.slice(0, 8),
           { sentence: "" },
         ],
       });
@@ -215,24 +227,8 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       }
     });
 
-    it("passes when nine_things_loved and ten_things_she_loves_doing have at least 3 filled rows", () => {
-      const result = page2Schema.safeParse({
-        ...validPage2Base,
-        nine_things_loved: [
-          { sentence: "Her infectious laugh" },
-          { sentence: "Her generosity" },
-          { sentence: "Her impeccable taste in music" },
-          { sentence: "" },
-          { sentence: "" },
-        ],
-        ten_things_she_loves_doing: [
-          { activity: "Saturday pilates class" },
-          { activity: "Iced matcha lattes" },
-          { activity: "Hosting weekend dinner parties" },
-          { activity: "" },
-        ],
-      });
-
+    it("passes when nine_things_loved has all 9 filled rows and ten_things_she_loves_doing has all 10 filled rows", () => {
+      const result = page2Schema.safeParse(validPage2Base);
       expect(result.success).toBe(true);
     });
 
@@ -326,19 +322,23 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         songs: [
           { song_title: "CUFF IT", artist: "Beyoncé" },
           { song_title: "Snooze", artist: "SZA" },
-          { song_title: "Water", artist: "" }, // incomplete 3rd row
+          { song_title: "Water", artist: "Tyla" },
+          { song_title: "Essence", artist: "Wizkid" },
+          { song_title: "Calm Down", artist: "" }, // incomplete 5th row
         ],
       });
 
       expect(result.success).toBe(false);
     });
 
-    it("passes when at least 3 complete songs are provided", () => {
+    it("passes when at least 5 complete songs are provided", () => {
       const result = page6Schema.safeParse({
         songs: [
           { song_title: "CUFF IT", artist: "Beyoncé" },
           { song_title: "Snooze", artist: "SZA" },
           { song_title: "Water", artist: "Tyla" },
+          { song_title: "Essence", artist: "Wizkid" },
+          { song_title: "Calm Down", artist: "Rema" },
           { song_title: "", artist: "" },
         ],
       });
@@ -365,7 +365,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
 
     it("fails with friendly message when fewer than 15 solo photos are uploaded", () => {
       const soloPhotos = Array.from({ length: 12 }, (_, i) => makeMockPhoto(i, "solo"));
-      const sharedPhotos = Array.from({ length: 4 }, (_, i) => makeMockPhoto(i, "shared"));
+      const sharedPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "shared"));
       const result = page8Schema.safeParse({
         solo_photos: soloPhotos,
         shared_photos: sharedPhotos,
@@ -380,9 +380,9 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       }
     });
 
-    it("fails with friendly message when fewer than 4 shared photos are uploaded", () => {
+    it("fails with friendly message when fewer than 15 shared photos are uploaded", () => {
       const soloPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "solo"));
-      const sharedPhotos = Array.from({ length: 2 }, (_, i) => makeMockPhoto(i, "shared"));
+      const sharedPhotos = Array.from({ length: 12 }, (_, i) => makeMockPhoto(i, "shared"));
       const result = page8Schema.safeParse({
         solo_photos: soloPhotos,
         shared_photos: sharedPhotos,
@@ -397,9 +397,9 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       }
     });
 
-    it("passes when at least 15 solo and 4 shared photos are uploaded", () => {
+    it("passes when at least 15 solo and 15 shared photos are uploaded", () => {
       const soloPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "solo"));
-      const sharedPhotos = Array.from({ length: 4 }, (_, i) => makeMockPhoto(i, "shared"));
+      const sharedPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "shared"));
       const result = page8Schema.safeParse({
         solo_photos: soloPhotos,
         shared_photos: sharedPhotos,
@@ -411,7 +411,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
 
     it("fails when more than 30 photos are uploaded in either category", () => {
       const soloPhotos = Array.from({ length: 31 }, (_, i) => makeMockPhoto(i, "solo"));
-      const sharedPhotos = Array.from({ length: 4 }, (_, i) => makeMockPhoto(i, "shared"));
+      const sharedPhotos = Array.from({ length: 15 }, (_, i) => makeMockPhoto(i, "shared"));
       const result = page8Schema.safeParse({
         solo_photos: soloPhotos,
         shared_photos: sharedPhotos,
