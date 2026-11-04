@@ -21,6 +21,7 @@ import {
   AdminResetFiltersButton,
   AdminPaginationNav,
 } from "@/components/admin/admin-nav-actions";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 const PAGE_SIZE = 10;
 
@@ -336,6 +337,10 @@ export default async function AdminOrdersPage({
             />
           </div>
         )}
+      </div>
+
+      <div className="pt-6 pb-2">
+        <BoboStudioTag variant="seal" />
       </div>
     </div>
   );

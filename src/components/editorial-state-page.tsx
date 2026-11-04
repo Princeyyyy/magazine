@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { BrandLogoMark } from "@/components/icons/SectionIcons";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 interface EditorialStatePageProps {
   /** Large decorative folio number, e.g. "404" */
@@ -38,7 +39,10 @@ export function EditorialStatePage({
               className="flex items-center gap-3 font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal"
             >
               <BrandLogoMark className="h-9 w-9 shrink-0" />
-              <span>Custom Magazine</span>
+              <div className="flex flex-col">
+                <span>Custom Magazine</span>
+                <BoboStudioTag variant="masthead" />
+              </div>
             </Link>
           </div>
         </header>
@@ -86,6 +90,10 @@ export function EditorialStatePage({
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               {actions}
+            </div>
+
+            <div className="pt-2">
+              <BoboStudioTag variant="seal" />
             </div>
 
             {footnote && (

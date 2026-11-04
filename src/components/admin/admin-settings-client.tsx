@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertCircle, Play, Loader2 } from "lucide-react";
+import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 interface ServiceModeSummary {
   isDevMode: boolean;
@@ -276,6 +277,10 @@ export function AdminSettingsClient({
           )}
         </section>
       )}
+
+      <div className="pt-6 border-t border-[#EFE6E0]">
+        <BoboStudioTag variant="seal" />
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
+import { env } from "@/env";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -20,6 +21,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL || "https://magazine.bobostudio.co.ke"),
   title: "Custom Magazine — Product of Bobo Studio",
   description:
     "Create a personalised, one-of-a-kind glossy magazine crafted from the stories, memories, and photos shared by someone who loves them. A product of Bobo Studio.",
@@ -33,6 +35,19 @@ export const metadata: Metadata = {
       { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  openGraph: {
+    title: "Custom Magazine — Product of Bobo Studio",
+    description:
+      "Create a personalised, one-of-a-kind glossy magazine crafted from the stories, memories, and photos shared by someone who loves them.",
+    images: [{ url: "/preview.png", width: 1200, height: 630, alt: "Custom Magazine Preview" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Custom Magazine — Product of Bobo Studio",
+    description:
+      "Create a personalised, one-of-a-kind glossy magazine crafted from the stories, memories, and photos shared by someone who loves them.",
+    images: ["/preview.png"],
   },
 };
 
