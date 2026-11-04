@@ -23,17 +23,19 @@ export default async function AdminLayout({
           <div className="flex items-center gap-5">
             <Link
               href="/admin"
-              className="flex items-center gap-3 font-serif text-2xl tracking-tight text-[#1F1619]"
+              className="flex items-center gap-3 sm:gap-3.5 group"
             >
-              <BrandLogoMark className="h-9 w-9 shrink-0" />
-              <div className="flex flex-col">
+              <BrandLogoMark className="h-11 sm:h-13 w-auto shrink-0 transition-transform duration-200 group-hover:scale-102" />
+              <div className="flex flex-col justify-center">
                 <div className="flex items-center gap-2">
-                  <span className="leading-tight">Custom Magazine</span>
-                  <span className="font-sans text-xs uppercase tracking-widest text-[#9E4765]">
+                  <span className="font-serif text-2xl tracking-tight text-[#1F1619] leading-none">
+                    Custom Magazine
+                  </span>
+                  <span className="font-sans text-[11px] uppercase tracking-widest text-[#9E4765] font-medium">
                     Editorial Desk
                   </span>
                 </div>
-                <BoboStudioTag variant="masthead" />
+                <BoboStudioTag variant="masthead" className="mt-1" />
               </div>
             </Link>
           </div>

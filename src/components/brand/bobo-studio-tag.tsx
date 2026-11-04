@@ -18,16 +18,16 @@ export function BoboStudioTag({
 }: BoboStudioTagProps) {
   const flowerSrc =
     color === "brown"
-      ? "/brand/png/flower-brown-256.png"
-      : "/brand/png/flower-pink-256.png";
+      ? "/brand/png/flower-brown-trim-378.png"
+      : "/brand/png/flower-pink-trim-370.png";
 
   if (variant === "logo") {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/brand/png/robo-studio-logo-256.png"
+        src="/brand/png/robo-studio-logo-trim-436.png"
         alt="Bobo Studio"
-        className={cn("h-8 w-auto object-contain inline-block", className)}
+        className={cn("h-9 sm:h-11 w-auto object-contain inline-block", className)}
         loading="lazy"
       />
     );

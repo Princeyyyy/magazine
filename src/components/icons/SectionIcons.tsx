@@ -113,7 +113,7 @@ export interface BrandLogoProps
 
 /**
  * Official Robo Studio Brand Logo Mark
- * Renders the authentic studio wordmark/emblem across the magazine app (navbars, headers, modals, etc.)
+ * Renders the authentic studio wordmark/emblem trimmed cleanly so it fits proudly in navbars and headers.
  */
 export function BrandLogoMark({
   className,
@@ -123,17 +123,17 @@ export function BrandLogoMark({
 }: BrandLogoProps) {
   const src =
     variant === "flower"
-      ? "/brand/png/flower-pink-256.png"
+      ? "/brand/png/flower-pink-trim-370.png"
       : variant === "flower-brown"
-        ? "/brand/png/flower-brown-256.png"
-        : "/brand/png/robo-studio-logo-256.png";
+        ? "/brand/png/flower-brown-trim-378.png"
+        : "/brand/png/robo-studio-logo-trim-436.png";
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={alt}
-      className={className ? `object-contain ${className}` : "h-9 w-9 object-contain shrink-0"}
+      className={className ? `object-contain ${className}` : "h-11 sm:h-13 w-auto object-contain shrink-0"}
       loading="lazy"
       {...props}
     />
@@ -152,17 +152,17 @@ export function BrandLogoTransparent({
 }: BrandLogoProps) {
   const src =
     variant === "flower-brown"
-      ? "/brand/png/flower-brown-256.png"
+      ? "/brand/png/flower-brown-trim-378.png"
       : variant === "logo"
-        ? "/brand/png/robo-studio-logo-256.png"
-        : "/brand/png/flower-pink-256.png";
+        ? "/brand/png/robo-studio-logo-trim-436.png"
+        : "/brand/png/flower-pink-trim-370.png";
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={alt}
-      className={className ? `object-contain ${className}` : "h-7 w-7 object-contain shrink-0"}
+      className={className ? `object-contain ${className}` : "h-7 w-auto object-contain shrink-0"}
       loading="lazy"
       {...props}
     />

@@ -36,12 +36,14 @@ export function EditorialStatePage({
           <div className="mx-auto max-w-5xl px-4 sm:px-6 py-5 flex items-center justify-between">
             <Link
               href="/"
-              className="flex items-center gap-3 font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal"
+              className="flex items-center gap-3 sm:gap-4 group"
             >
-              <BrandLogoMark className="h-10 w-10 sm:h-11 sm:w-11 shrink-0" />
-              <div className="flex flex-col">
-                <span className="leading-tight">Custom Magazine</span>
-                <BoboStudioTag variant="masthead" />
+              <BrandLogoMark className="h-12 sm:h-14 w-auto shrink-0 transition-transform duration-200 group-hover:scale-102" />
+              <div className="flex flex-col justify-center">
+                <span className="font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal leading-none">
+                  Custom Magazine
+                </span>
+                <BoboStudioTag variant="masthead" className="mt-1" />
               </div>
             </Link>
           </div>
@@ -66,7 +68,7 @@ export function EditorialStatePage({
 
           <div className="relative space-y-6">
             <div className="flex justify-center">
-              <BrandLogoMark className="h-16 w-16 drop-shadow-xs" />
+              <BrandLogoMark className="h-20 sm:h-24 w-auto drop-shadow-xs" />
             </div>
 
             <div className="space-y-3">

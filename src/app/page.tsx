@@ -21,16 +21,18 @@ export default async function HomePage() {
       />
 
       {/* Editorial Masthead Header */}
-      <header className="border-b border-[#EFE6E0]/80 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-[#EFE6E0]/80 bg-white/85 backdrop-blur-md sticky top-0 z-30">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-3 sm:py-3.5 flex items-center justify-between gap-4">
           <Link
             href="/"
-            className="flex items-center gap-3 font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal"
+            className="flex items-center gap-3 sm:gap-4 group"
           >
-            <BrandLogoMark className="h-10 w-10 sm:h-11 sm:w-11 shrink-0" />
-            <div className="flex flex-col">
-              <span className="leading-tight">Custom Magazine</span>
-              <BoboStudioTag variant="masthead" />
+            <BrandLogoMark className="h-12 sm:h-14 w-auto shrink-0 transition-transform duration-200 group-hover:scale-102" />
+            <div className="flex flex-col justify-center">
+              <span className="font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal leading-none">
+                Custom Magazine
+              </span>
+              <BoboStudioTag variant="masthead" className="mt-1" />
             </div>
           </Link>
 

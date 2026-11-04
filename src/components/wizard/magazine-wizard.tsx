@@ -905,7 +905,7 @@ export function MagazineWizard({
     return (
       <div className="mx-auto max-w-2xl py-24 text-center space-y-4 animate-editorial-in">
         <div className="flex justify-center">
-          <BrandLogoMark className="h-16 w-16 drop-shadow-xs" />
+          <BrandLogoMark className="h-20 sm:h-24 w-auto drop-shadow-xs" />
         </div>
         <p className="text-xs uppercase tracking-[0.25em] text-[#9E4765]">
           Custom Magazine

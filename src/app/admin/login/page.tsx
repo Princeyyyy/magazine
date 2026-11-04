@@ -22,7 +22,7 @@ export default async function AdminLoginPage() {
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <BrandLogoMark className="h-12 w-12 shrink-0 drop-shadow-xs" />
+                  <BrandLogoMark className="h-14 sm:h-16 w-auto shrink-0 drop-shadow-xs" />
                   <div>
                     <span className="font-serif text-2xl tracking-tight text-[#1F1619] block leading-tight">
                       Custom Magazine
