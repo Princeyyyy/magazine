@@ -23,15 +23,13 @@ export function BoboStudioTag({
 
   if (variant === "logo") {
     return (
-      <div className={cn("inline-flex items-center gap-2", className)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/png/robo-studio-logo-256.png"
-          alt="Bobo Studio"
-          className="h-8 w-auto object-contain"
-          loading="lazy"
-        />
-      </div>
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/brand/png/robo-studio-logo-256.png"
+        alt="Bobo Studio"
+        className={cn("h-8 w-auto object-contain inline-block", className)}
+        loading="lazy"
+      />
     );
   }
 

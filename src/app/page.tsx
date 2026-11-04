@@ -27,9 +27,9 @@ export default async function HomePage() {
             href="/"
             className="flex items-center gap-3 font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal"
           >
-            <BrandLogoMark className="h-9 w-9 shrink-0" />
+            <BrandLogoMark className="h-10 w-10 sm:h-11 sm:w-11 shrink-0" />
             <div className="flex flex-col">
-              <span>Custom Magazine</span>
+              <span className="leading-tight">Custom Magazine</span>
               <BoboStudioTag variant="masthead" />
             </div>
           </Link>
@@ -49,9 +49,12 @@ export default async function HomePage() {
                 </Link>
               </div>
             ) : (
-              <span className="italic font-serif text-xs sm:text-sm text-[#8C7A80]">
-                The Bespoke Issue
-              </span>
+              <div className="flex items-center gap-2 rounded-full border border-[#EAE0DA] bg-white/70 px-3 py-1 shadow-2xs">
+                <span className="italic font-serif text-xs sm:text-sm text-[#7A686E]">
+                  The Bespoke Issue
+                </span>
+                <BrandLogoTransparent className="h-3.5 w-3.5 shrink-0" />
+              </div>
             )}
           </div>
         </div>

@@ -2,7 +2,10 @@ import React from "react";
 import Link from "next/link";
 import { getAuthenticatedAdminEmail, isSuperAdminEmail } from "@/auth";
 import { AdminSignOutButton } from "@/components/admin/admin-signout-button";
-import { BrandLogoMark } from "@/components/icons/SectionIcons";
+import {
+  BrandLogoMark,
+  BrandLogoTransparent,
+} from "@/components/icons/SectionIcons";
 import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 export default async function AdminLayout({
@@ -22,10 +25,10 @@ export default async function AdminLayout({
               href="/admin"
               className="flex items-center gap-3 font-serif text-2xl tracking-tight text-[#1F1619]"
             >
-              <BrandLogoMark className="h-8 w-8 shrink-0" />
+              <BrandLogoMark className="h-9 w-9 shrink-0" />
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span>Custom Magazine</span>
+                  <span className="leading-tight">Custom Magazine</span>
                   <span className="font-sans text-xs uppercase tracking-widest text-[#9E4765]">
                     Editorial Desk
                   </span>
@@ -73,9 +76,12 @@ export default async function AdminLayout({
 
       <footer className="border-t border-[#EFE6E0] bg-white/70 py-5 px-4 sm:px-6 text-xs text-[#8C7A80]">
         <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="font-serif italic text-sm text-[#6E5A61]">
-            Custom Magazine &mdash; Editorial Production Desk
-          </p>
+          <div className="flex items-center gap-2">
+            <BrandLogoTransparent className="h-5 w-5 shrink-0" />
+            <p className="font-serif italic text-sm text-[#6E5A61]">
+              Custom Magazine &mdash; Editorial Production Desk
+            </p>
+          </div>
           <div className="flex items-center gap-4">
             <BoboStudioTag variant="footer" />
             <span className="text-[#E6DAD3]">&bull;</span>

@@ -19,13 +19,18 @@ export default async function AdminLoginPage() {
         {/* Left Column: Info & Public Guidance */}
         <div className="md:col-span-5 bg-[#FCF9F7] p-6 sm:p-8 border-b md:border-b-0 md:border-r border-[#EFE6E0] flex flex-col justify-between space-y-6">
           <div className="space-y-4">
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <BrandLogoMark className="h-10 w-10 shrink-0 shadow-2xs" />
+                <div className="flex items-center gap-3">
+                  <BrandLogoMark className="h-12 w-12 shrink-0 drop-shadow-xs" />
+                  <div>
+                    <span className="font-serif text-2xl tracking-tight text-[#1F1619] block leading-tight">
+                      Custom Magazine
+                    </span>
+                    <BoboStudioTag variant="masthead" />
+                  </div>
+                </div>
                 <BoboStudioTag variant="badge" />
-              </div>
-              <div className="pt-1">
-                <BoboStudioTag variant="logo" className="h-7 w-auto" />
               </div>
             </div>
 

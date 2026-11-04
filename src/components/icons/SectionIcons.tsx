@@ -105,109 +105,66 @@ export function getSectionIcon(pageId: string): React.ComponentType<P> {
   );
 }
 
-/**
- * Brand logo mark on rose gradient tile (from assets/logo/logo-mark.svg)
- */
-export const BrandLogoMark = (p: P) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 64 64"
-    width={36}
-    height={36}
-    aria-hidden="true"
-    {...p}
-  >
-    <defs>
-      <linearGradient id="brand-gi" x1="0" y1="0" x2="0.6" y2="1">
-        <stop offset="0" stopColor="#FF7BAE" />
-        <stop offset="1" stopColor="#D93272" />
-      </linearGradient>
-      <clipPath id="brand-ci">
-        <rect x="16" y="8" width="32" height="48" rx="3.2" />
-      </clipPath>
-    </defs>
-    <rect width="64" height="64" rx="14" fill="url(#brand-gi)" />
-    <g>
-      <rect
-        x="17.5"
-        y="10"
-        width="32"
-        height="48"
-        rx="3.2"
-        fill="#8E1B4B"
-        opacity=".28"
-      />
-      <g clipPath="url(#brand-ci)">
-        <rect x="16" y="8" width="32" height="48" fill="#FFF6F9" />
-        <rect x="16" y="8" width="6.2" height="48" fill="#F7CADB" />
-      </g>
-      <path
-        d="M22.2 8.6V55.4"
-        stroke="#D93272"
-        strokeOpacity=".35"
-        strokeWidth=".8"
-      />
-      <rect x="25" y="15" width="19" height="3.6" rx="1.2" fill="#8E1B4B" />
-      <rect x="25" y="21" width="11" height="1.8" rx=".9" fill="#F7CADB" />
-      <path
-        d="M35.2 23.5 Q37.3 31.9 45.7 34 Q37.3 36.1 35.2 44.5 Q33.1 36.1 24.7 34 Q33.1 31.9 35.2 23.5Z"
-        fill="#8E1B4B"
-      />
-      <path
-        d="M42.5 42.3 Q43.34 45.66 46.7 46.5 Q43.34 47.34 42.5 50.7 Q41.66 47.34 38.3 46.5 Q41.66 45.66 42.5 42.3Z"
-        fill="#F6B95C"
-      />
-    </g>
-  </svg>
-);
+export interface BrandLogoProps
+  extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src"> {
+  className?: string;
+  variant?: "logo" | "flower" | "flower-brown";
+}
 
 /**
- * Transparent brand logo mark (from assets/logo/logo-mark-transparent.svg)
+ * Official Robo Studio Brand Logo Mark
+ * Renders the authentic studio wordmark/emblem across the magazine app (navbars, headers, modals, etc.)
  */
-export const BrandLogoTransparent = (p: P) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 64 64"
-    width={32}
-    height={32}
-    aria-hidden="true"
-    {...p}
-  >
-    <defs>
-      <clipPath id="brand-ct">
-        <rect x="16" y="8" width="32" height="48" rx="3.2" />
-      </clipPath>
-    </defs>
-    <g>
-      <rect
-        x="17.5"
-        y="10"
-        width="32"
-        height="48"
-        rx="3.2"
-        fill="#8E1B4B"
-        opacity=".28"
-      />
-      <g clipPath="url(#brand-ct)">
-        <rect x="16" y="8" width="32" height="48" fill="#FFF6F9" />
-        <rect x="16" y="8" width="6.2" height="48" fill="#F7CADB" />
-      </g>
-      <path
-        d="M22.2 8.6V55.4"
-        stroke="#D93272"
-        strokeOpacity=".35"
-        strokeWidth=".8"
-      />
-      <rect x="25" y="15" width="19" height="3.6" rx="1.2" fill="#8E1B4B" />
-      <rect x="25" y="21" width="11" height="1.8" rx=".9" fill="#F7CADB" />
-      <path
-        d="M35.2 23.5 Q37.3 31.9 45.7 34 Q37.3 36.1 35.2 44.5 Q33.1 36.1 24.7 34 Q33.1 31.9 35.2 23.5Z"
-        fill="#8E1B4B"
-      />
-      <path
-        d="M42.5 42.3 Q43.34 45.66 46.7 46.5 Q43.34 47.34 42.5 50.7 Q41.66 47.34 38.3 46.5 Q41.66 45.66 42.5 42.3Z"
-        fill="#F6B95C"
-      />
-    </g>
-  </svg>
-);
+export function BrandLogoMark({
+  className,
+  alt = "Bobo Studio",
+  variant = "logo",
+  ...props
+}: BrandLogoProps) {
+  const src =
+    variant === "flower"
+      ? "/brand/png/flower-pink-256.png"
+      : variant === "flower-brown"
+        ? "/brand/png/flower-brown-256.png"
+        : "/brand/png/robo-studio-logo-256.png";
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className={className ? `object-contain ${className}` : "h-9 w-9 object-contain shrink-0"}
+      loading="lazy"
+      {...props}
+    />
+  );
+}
+
+/**
+ * Official Robo Studio Flower Emblem (Transparent)
+ * Renders the iconic pink or brown flower emblem.
+ */
+export function BrandLogoTransparent({
+  className,
+  alt = "Bobo Studio Emblem",
+  variant = "flower",
+  ...props
+}: BrandLogoProps) {
+  const src =
+    variant === "flower-brown"
+      ? "/brand/png/flower-brown-256.png"
+      : variant === "logo"
+        ? "/brand/png/robo-studio-logo-256.png"
+        : "/brand/png/flower-pink-256.png";
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className={className ? `object-contain ${className}` : "h-7 w-7 object-contain shrink-0"}
+      loading="lazy"
+      {...props}
+    />
+  );
+}

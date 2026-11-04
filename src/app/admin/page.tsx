@@ -135,9 +135,12 @@ export default async function AdminOrdersPage({
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="font-serif italic text-base text-[#9E4765]">
-            Editorial Queue
-          </p>
+          <div className="flex items-center gap-2">
+            <BoboStudioTag variant="flower" className="h-4 w-4 shrink-0" />
+            <p className="font-serif italic text-base text-[#9E4765]">
+              Editorial Queue
+            </p>
+          </div>
           <h1 className="font-serif text-3xl sm:text-4xl text-[#1F1619]">
             Magazine Orders ({totalCount})
           </h1>

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Check, Copy, MessageCircle } from "lucide-react";
-import { BrandLogoTransparent } from "@/components/icons/SectionIcons";
+import { BrandLogoMark } from "@/components/icons/SectionIcons";
 import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 
 interface ThankYouViewProps {
@@ -31,13 +31,17 @@ export function ThankYouView({ reference, herName }: ThankYouViewProps) {
 
   return (
     <div className="mx-auto max-w-2xl rounded-3xl border border-[#EFE6E0] bg-white p-8 sm:p-14 text-center space-y-8 shadow-[0_12px_40px_-16px_rgba(31,22,25,0.08)]">
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex justify-center">
-          <BrandLogoTransparent className="h-12 w-12" />
+          <BrandLogoMark className="h-20 w-20 drop-shadow-sm" />
         </div>
-        <p className="font-serif italic text-lg text-[#9E4765]">
-          Custom Magazine
-        </p>
+        <div className="flex items-center justify-center gap-2">
+          <p className="font-serif italic text-lg text-[#9E4765]">
+            Custom Magazine
+          </p>
+          <span className="text-[#C2B2B8]">&bull;</span>
+          <BoboStudioTag variant="masthead" />
+        </div>
         <h1 className="font-serif text-3xl sm:text-4xl font-normal text-[#1F1619] leading-tight">
           Thank you! I can&apos;t wait to create the magazine.
         </h1>

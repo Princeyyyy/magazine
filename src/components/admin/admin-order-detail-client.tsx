@@ -417,6 +417,7 @@ export function AdminOrderDetailClient({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#F3ECE7] pb-6">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-3">
+              <BoboStudioTag variant="flower" className="h-4 w-4 shrink-0" />
               <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#9E4765] bg-[#F6EBF0] px-3 py-1 rounded-full">
                 {order.reference}
               </span>

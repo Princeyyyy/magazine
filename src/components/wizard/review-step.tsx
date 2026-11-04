@@ -7,7 +7,10 @@ import {
   type UploadedPhotoItem,
 } from "@/config/form";
 import { Button } from "@/components/ui/button";
-import { getSectionIcon } from "@/components/icons/SectionIcons";
+import {
+  getSectionIcon,
+  BrandLogoTransparent,
+} from "@/components/icons/SectionIcons";
 import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 import { Star, Pencil, Image as ImageIcon } from "lucide-react";
 
@@ -39,9 +42,12 @@ export function ReviewStep({
   return (
     <div className="space-y-8">
       <div className="border-b border-[#E3D4CC] pb-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-[#9E4765] font-medium mb-1">
-          Final Editorial Proof
-        </p>
+        <div className="flex items-center gap-2 mb-1">
+          <BrandLogoTransparent className="h-4 w-4 shrink-0" />
+          <p className="text-xs uppercase tracking-[0.2em] text-[#9E4765] font-medium">
+            Final Editorial Proof
+          </p>
+        </div>
         <h2 className="font-serif text-2xl sm:text-3xl text-[#1F1619]">
           Review Magazine Brief
         </h2>

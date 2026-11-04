@@ -23,9 +23,9 @@ export default function TermsOfServicePage() {
             href="/"
             className="flex items-center gap-3 font-serif text-2xl sm:text-3xl tracking-tight text-[#1F1619] font-normal"
           >
-            <BrandLogoMark className="h-9 w-9 shrink-0" />
+            <BrandLogoMark className="h-10 w-10 sm:h-11 sm:w-11 shrink-0" />
             <div className="flex flex-col">
-              <span>Custom Magazine</span>
+              <span className="leading-tight">Custom Magazine</span>
               <BoboStudioTag variant="masthead" />
             </div>
           </Link>

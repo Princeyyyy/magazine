@@ -26,6 +26,7 @@ import { ThankYouView } from "./thank-you-view";
 import {
   getSectionIcon,
   BrandLogoMark,
+  BrandLogoTransparent,
 } from "@/components/icons/SectionIcons";
 import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 import {
@@ -902,9 +903,9 @@ export function MagazineWizard({
 
   if (isResumingFromUrl) {
     return (
-      <div className="mx-auto max-w-2xl py-24 text-center space-y-3 animate-editorial-in">
+      <div className="mx-auto max-w-2xl py-24 text-center space-y-4 animate-editorial-in">
         <div className="flex justify-center">
-          <BrandLogoMark className="h-12 w-12" />
+          <BrandLogoMark className="h-16 w-16 drop-shadow-xs" />
         </div>
         <p className="text-xs uppercase tracking-[0.25em] text-[#9E4765]">
           Custom Magazine
@@ -912,6 +913,7 @@ export function MagazineWizard({
         <p className="font-serif italic text-2xl text-[#1F1619]">
           Restoring your saved magazine brief...
         </p>
+        <BoboStudioTag variant="seal" className="pt-2" />
       </div>
     );
   }
@@ -1278,6 +1280,7 @@ export function MagazineWizard({
       <div className="rounded-2xl border border-[#EFE6E0] bg-white/95 backdrop-blur-md px-4 sm:px-5 py-4 shadow-[0_4px_24px_-8px_rgba(31,22,25,0.05)] space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
+            <BrandLogoTransparent className="h-4 w-4 shrink-0" />
             <span className="text-xs font-medium tracking-wider uppercase text-[#9E4765]">
               {isReviewStep
                 ? "Final Proof"
