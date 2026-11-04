@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { env } from "@/env";
 import "./globals.css";
 
@@ -60,6 +61,7 @@ export default function RootLayout({
     <html lang="en" className={`${cormorant.variable} ${plusJakarta.variable}`}>
       <body className="min-h-screen bg-[#FAF6F3] text-[#1F1619] flex flex-col">
         {children}
+        <Analytics />
       </body>
     </html>
   );
