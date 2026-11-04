@@ -113,7 +113,7 @@ export interface BrandLogoProps
 
 /**
  * Official Robo Studio Brand Logo Mark
- * Renders the authentic studio wordmark/emblem trimmed cleanly so it fits proudly in navbars and headers.
+ * Renders the authentic full-color studio wordmark/emblem trimmed cleanly so it fits proudly in navbars and headers.
  */
 export function BrandLogoMark({
   className,
@@ -123,10 +123,10 @@ export function BrandLogoMark({
 }: BrandLogoProps) {
   const src =
     variant === "flower"
-      ? "/brand/png/flower-pink-trim-370.png"
+      ? "/brand/png/bobo-flower-pink-color.png"
       : variant === "flower-brown"
-        ? "/brand/png/flower-brown-trim-378.png"
-        : "/brand/png/robo-studio-logo-trim-436.png";
+        ? "/brand/png/bobo-flower-brown-color.png"
+        : "/brand/png/bobo-studio-logo-color.png";
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -152,10 +152,10 @@ export function BrandLogoTransparent({
 }: BrandLogoProps) {
   const src =
     variant === "flower-brown"
-      ? "/brand/png/flower-brown-trim-378.png"
+      ? "/brand/png/bobo-flower-brown-color.png"
       : variant === "logo"
-        ? "/brand/png/robo-studio-logo-trim-436.png"
-        : "/brand/png/flower-pink-trim-370.png";
+        ? "/brand/png/bobo-studio-logo-color.png"
+        : "/brand/png/bobo-flower-pink-color.png";
 
   return (
     // eslint-disable-next-line @next/next/no-img-element

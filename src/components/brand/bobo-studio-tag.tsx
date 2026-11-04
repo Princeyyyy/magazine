@@ -18,14 +18,14 @@ export function BoboStudioTag({
 }: BoboStudioTagProps) {
   const flowerSrc =
     color === "brown"
-      ? "/brand/png/flower-brown-trim-378.png"
-      : "/brand/png/flower-pink-trim-370.png";
+      ? "/brand/png/bobo-flower-brown-color.png"
+      : "/brand/png/bobo-flower-pink-color.png";
 
   if (variant === "logo") {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/brand/png/robo-studio-logo-trim-436.png"
+        src="/brand/png/bobo-studio-logo-color.png"
         alt="Bobo Studio"
         className={cn("h-9 sm:h-11 w-auto object-contain inline-block", className)}
         loading="lazy"
