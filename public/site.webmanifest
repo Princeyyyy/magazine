@@ -1,6 +1,6 @@
 {
-  "name": "Her Custom Magazine",
-  "short_name": "Her Magazine",
+  "name": "Custom Magazine",
+  "short_name": "Custom Magazine",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
