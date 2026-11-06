@@ -69,10 +69,10 @@ export const envSchema = z.object({
       (val) =>
         typeof val === "string" && val.trim() !== ""
           ? val.trim()
-          : "Custom Magazine <noreply@cleanplay.app>",
+          : "Custom Magazine <noreply@bobostudio.co.ke>",
       z.string()
     )
-    .default("Custom Magazine <noreply@cleanplay.app>"),
+    .default("Custom Magazine <noreply@bobostudio.co.ke>"),
 });
 
 export type Env = z.infer<typeof envSchema> & {

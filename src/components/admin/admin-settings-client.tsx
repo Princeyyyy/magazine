@@ -114,7 +114,7 @@ export function AdminSettingsClient({
       title: "Mailer Adapter (Resend)",
       activeAdapter:
         modeSummary.mailer === "resend"
-          ? "ResendMailer (Custom Magazine <noreply@cleanplay.app>)"
+          ? "ResendMailer (Custom Magazine <noreply@bobostudio.co.ke>)"
           : "ConsoleMailer (Terminal + dev_outbox)",
       isLive: modeSummary.mailer === "resend",
       description:
