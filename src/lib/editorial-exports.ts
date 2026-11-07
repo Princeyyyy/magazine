@@ -15,6 +15,50 @@ import {
 } from "docx";
 import { jsPDF } from "jspdf";
 import { FORM_PAGES, adaptCopyByGender, type FieldConfig } from "@/config/form";
+import { splitTextAndEmojis, cleanXmlControlChars } from "@/lib/editorial-text";
+
+export interface CreateTextRunsOptions {
+  font?: string;
+  size?: number;
+  color?: string;
+  bold?: boolean;
+  italics?: boolean;
+}
+
+/**
+ * Creates an array of TextRuns for Word (.docx) that keeps ALL emojis intact,
+ * assigning system emoji font fallback ('Segoe UI Emoji' / 'Apple Color Emoji')
+ * to emoji segments while preserving 'Georgia' for all prose text.
+ */
+export function createEditorialTextRuns(
+  rawText: string,
+  options: CreateTextRunsOptions = {}
+): TextRun[] {
+  const sanitized = cleanXmlControlChars(rawText);
+  if (!sanitized) return [];
+
+  const segments = splitTextAndEmojis(sanitized);
+  const baseFont = options.font || "Georgia";
+
+  return segments.map((seg) => {
+    if (seg.isEmoji) {
+      return new TextRun({
+        text: seg.text,
+        font: "Segoe UI Emoji",
+        size: options.size,
+      });
+    }
+
+    return new TextRun({
+      text: seg.text,
+      font: baseFont,
+      size: options.size,
+      color: options.color,
+      bold: options.bold,
+      italics: options.italics,
+    });
+  });
+}
 
 export interface EditorialExportOrder {
   id: string;
@@ -87,7 +131,7 @@ export function hasAnyAnswerInOrder(
   return false;
 }
 
-function getFormattedFieldLines(
+export function getFormattedFieldLines(
   field: FieldConfig,
   values: Record<string, unknown>
 ): string[] {
@@ -142,15 +186,15 @@ export async function generateOrderWordBlob(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 120, after: 120 },
-      children: [
-        new TextRun({
-          text: "CUSTOM MAGAZINE  •  BESPOKE EDITORIAL BRIEF",
+      children: createEditorialTextRuns(
+        "CUSTOM MAGAZINE  •  BESPOKE EDITORIAL BRIEF",
+        {
           font: "Georgia",
           size: 18,
           color: "9E4765",
           bold: true,
-        }),
-      ],
+        }
+      ),
     })
   );
 
@@ -159,15 +203,12 @@ export async function generateOrderWordBlob(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 120 },
-      children: [
-        new TextRun({
-          text: starName,
-          font: "Georgia",
-          size: 56,
-          color: "1F1619",
-          bold: true,
-        }),
-      ],
+      children: createEditorialTextRuns(starName, {
+        font: "Georgia",
+        size: 56,
+        color: "1F1619",
+        bold: true,
+      }),
     })
   );
 
@@ -177,15 +218,12 @@ export async function generateOrderWordBlob(
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 320 },
-        children: [
-          new TextRun({
-            text: `“${order.coverHeadline}”`,
-            font: "Georgia",
-            italics: true,
-            size: 26,
-            color: "6E5A61",
-          }),
-        ],
+        children: createEditorialTextRuns(`“${order.coverHeadline}”`, {
+          font: "Georgia",
+          italics: true,
+          size: 26,
+          color: "6E5A61",
+        }),
       })
     );
   }
@@ -239,15 +277,12 @@ export async function generateOrderWordBlob(
                 children: [
                   new Paragraph({
                     spacing: { before: 80, after: 80 },
-                    children: [
-                      new TextRun({
-                        text: label,
-                        font: "Georgia",
-                        bold: true,
-                        size: 20,
-                        color: "7A2E48",
-                      }),
-                    ],
+                    children: createEditorialTextRuns(label, {
+                      font: "Georgia",
+                      bold: true,
+                      size: 20,
+                      color: "7A2E48",
+                    }),
                   }),
                 ],
               }),
@@ -262,14 +297,11 @@ export async function generateOrderWordBlob(
                 children: [
                   new Paragraph({
                     spacing: { before: 80, after: 80 },
-                    children: [
-                      new TextRun({
-                        text: val,
-                        font: "Georgia",
-                        size: 20,
-                        color: "1F1619",
-                      }),
-                    ],
+                    children: createEditorialTextRuns(val, {
+                      font: "Georgia",
+                      size: 20,
+                      color: "1F1619",
+                    }),
                   }),
                 ],
               }),
@@ -299,15 +331,15 @@ export async function generateOrderWordBlob(
       children.push(
         new Paragraph({
           spacing: { before: 320, after: 60 },
-          children: [
-            new TextRun({
-              text: `CHAPTER ${page.pageNumber}  —  ${pageSubtitle.toUpperCase()}`,
+          children: createEditorialTextRuns(
+            `CHAPTER ${page.pageNumber}  —  ${pageSubtitle.toUpperCase()}`,
+            {
               font: "Georgia",
               size: 18,
               bold: true,
               color: "9E4765",
-            }),
-          ],
+            }
+          ),
         })
       );
 
@@ -318,15 +350,12 @@ export async function generateOrderWordBlob(
           border: {
             bottom: { style: BorderStyle.SINGLE, size: 6, color: "E3D4CC" },
           },
-          children: [
-            new TextRun({
-              text: pageTitle,
-              font: "Georgia",
-              size: 34,
-              bold: true,
-              color: "1F1619",
-            }),
-          ],
+          children: createEditorialTextRuns(pageTitle, {
+            font: "Georgia",
+            size: 34,
+            bold: true,
+            color: "1F1619",
+          }),
         })
       );
 
@@ -335,15 +364,13 @@ export async function generateOrderWordBlob(
           new Paragraph({
             spacing: { before: 120, after: 120 },
             children: [
-              new TextRun({
-                text: "Google Drive Folder Link: ",
+              ...createEditorialTextRuns("Google Drive Folder Link: ", {
                 font: "Georgia",
                 bold: true,
                 size: 21,
                 color: "1F1619",
               }),
-              new TextRun({
-                text: driveFolderUrl,
+              ...createEditorialTextRuns(driveFolderUrl, {
                 font: "Georgia",
                 size: 21,
                 color: "9E4765",
@@ -358,15 +385,13 @@ export async function generateOrderWordBlob(
           new Paragraph({
             spacing: { before: 80, after: 120 },
             children: [
-              new TextRun({
-                text: "Shared Photo Link Fallback: ",
+              ...createEditorialTextRuns("Shared Photo Link Fallback: ", {
                 font: "Georgia",
                 bold: true,
                 size: 21,
                 color: "1F1619",
               }),
-              new TextRun({
-                text: fallbackLink,
+              ...createEditorialTextRuns(fallbackLink, {
                 font: "Georgia",
                 size: 21,
                 color: "9E4765",
@@ -380,16 +405,16 @@ export async function generateOrderWordBlob(
         children.push(
           new Paragraph({
             spacing: { after: 160 },
-            children: [
-              new TextRun({
-                text: `Selected Cover Photo: ${coverPhoto.originalName}${coverPhoto.caption ? ` — “${coverPhoto.caption}”` : ""}`,
+            children: createEditorialTextRuns(
+              `Selected Cover Photo: ${coverPhoto.originalName}${coverPhoto.caption ? ` — “${coverPhoto.caption}”` : ""}`,
+              {
                 font: "Georgia",
                 bold: true,
                 italics: true,
                 size: 21,
                 color: "7A2E48",
-              }),
-            ],
+              }
+            ),
           })
         );
       }
@@ -411,15 +436,12 @@ export async function generateOrderWordBlob(
                       children: [
                         new Paragraph({
                           spacing: { before: 60, after: 60 },
-                          children: [
-                            new TextRun({
-                              text: hdr,
-                              font: "Georgia",
-                              bold: true,
-                              size: 19,
-                              color: "7A2E48",
-                            }),
-                          ],
+                          children: createEditorialTextRuns(hdr, {
+                            font: "Georgia",
+                            bold: true,
+                            size: 19,
+                            color: "7A2E48",
+                          }),
                         }),
                       ],
                     })
@@ -439,14 +461,11 @@ export async function generateOrderWordBlob(
                           children: [
                             new Paragraph({
                               spacing: { before: 60, after: 60 },
-                              children: [
-                                new TextRun({
-                                  text: cellText,
-                                  font: "Georgia",
-                                  size: 19,
-                                  color: "1F1619",
-                                }),
-                              ],
+                              children: createEditorialTextRuns(cellText, {
+                                font: "Georgia",
+                                size: 19,
+                                color: "1F1619",
+                              }),
                             }),
                           ],
                         })
@@ -493,15 +512,15 @@ export async function generateOrderWordBlob(
     children.push(
       new Paragraph({
         spacing: { before: 320, after: 60 },
-        children: [
-          new TextRun({
-            text: `CHAPTER ${page.pageNumber}  —  ${pageSubtitle.toUpperCase()}`,
+        children: createEditorialTextRuns(
+          `CHAPTER ${page.pageNumber}  —  ${pageSubtitle.toUpperCase()}`,
+          {
             font: "Georgia",
             size: 18,
             bold: true,
             color: "9E4765",
-          }),
-        ],
+          }
+        ),
       })
     );
 
@@ -512,15 +531,12 @@ export async function generateOrderWordBlob(
         border: {
           bottom: { style: BorderStyle.SINGLE, size: 6, color: "E3D4CC" },
         },
-        children: [
-          new TextRun({
-            text: pageTitle,
-            font: "Georgia",
-            size: 34,
-            bold: true,
-            color: "1F1619",
-          }),
-        ],
+        children: createEditorialTextRuns(pageTitle, {
+          font: "Georgia",
+          size: 34,
+          bold: true,
+          color: "1F1619",
+        }),
       })
     );
 
@@ -528,16 +544,13 @@ export async function generateOrderWordBlob(
       children.push(
         new Paragraph({
           spacing: { before: 220, after: 100 },
-          children: [
-            new TextRun({
-              text: group.title,
-              font: "Georgia",
-              bold: true,
-              italics: true,
-              size: 25,
-              color: "7A2E48",
-            }),
-          ],
+          children: createEditorialTextRuns(group.title, {
+            font: "Georgia",
+            bold: true,
+            italics: true,
+            size: 25,
+            color: "7A2E48",
+          }),
         })
       );
 
@@ -545,33 +558,32 @@ export async function generateOrderWordBlob(
         children.push(
           new Paragraph({
             spacing: { before: 120, after: 40 },
-            children: [
-              new TextRun({
-                text: field.label,
-                font: "Georgia",
-                bold: true,
-                size: 20,
-                color: "5C4950",
-              }),
-            ],
+            children: createEditorialTextRuns(field.label, {
+              font: "Georgia",
+              bold: true,
+              size: 20,
+              color: "5C4950",
+            }),
           })
         );
 
-        for (const line of field.lines) {
-          children.push(
-            new Paragraph({
-              spacing: { after: 80 },
-              indent: { left: 240 },
-              children: [
-                new TextRun({
-                  text: line,
+        for (const rawLine of field.lines) {
+          const sanitizedLine = cleanXmlControlChars(rawLine);
+          const paragraphs = sanitizedLine.split("\n");
+          for (const para of paragraphs) {
+            if (para.trim() === "") continue;
+            children.push(
+              new Paragraph({
+                spacing: { after: 80 },
+                indent: { left: 240 },
+                children: createEditorialTextRuns(para, {
                   font: "Georgia",
                   size: 21,
                   color: "1F1619",
                 }),
-              ],
-            })
-          );
+              })
+            );
+          }
         }
       }
     }
@@ -814,7 +826,8 @@ export function generateOrderPdfBlob(
 
       for (let i = 0; i < photos.length; i++) {
         const p = photos[i]!;
-        const line = `${String(i + 1).padStart(2, "0")}. ${p.originalName}${p.isCover ? " [COVER]" : ""} — ${p.caption || "(No caption)"}`;
+        const rawCaption = p.caption ? ` — "${cleanXmlControlChars(p.caption)}"` : " — (No caption)";
+        const line = `${String(i + 1).padStart(2, "0")}. ${p.originalName}${p.isCover ? " [COVER]" : ""}${rawCaption}`;
         const wrapped = doc.splitTextToSize(line, contentWidth - 12) as string[];
         ensureSpace(wrapped.length * 13 + 6);
         doc.setFont("times", "normal");
@@ -893,7 +906,8 @@ export function generateOrderPdfBlob(
       for (const field of group.fields) {
         const wrappedAnswers: string[] = [];
         for (const ans of field.lines) {
-          const split = doc.splitTextToSize(ans, contentWidth - 14) as string[];
+          const sanitizedAns = cleanXmlControlChars(ans);
+          const split = doc.splitTextToSize(sanitizedAns, contentWidth - 14) as string[];
           wrappedAnswers.push(...split);
         }
 

@@ -17,6 +17,7 @@ import {
   formatOrderStatusLabel,
   hasAnyAnswerInOrder,
 } from "@/lib/editorial-exports";
+import { cleanClipboardText } from "@/lib/editorial-text";
 import {
   Copy,
   Check,
@@ -25,6 +26,7 @@ import {
   Download,
   FileText,
   FileDown,
+  Printer,
   Star,
   ExternalLink,
   Loader2,
@@ -136,7 +138,7 @@ export function formatGroupAsText(
     }
   }
 
-  return lines.join("\n");
+  return cleanClipboardText(lines.join("\n"));
 }
 
 function triggerBlobDownload(blob: Blob, filename: string) {
@@ -199,7 +201,8 @@ export function AdminOrderDetailClient({
   };
 
   const copyText = async (key: string, text: string, label?: string) => {
-    await navigator.clipboard.writeText(text).catch(() => {});
+    const cleaned = cleanClipboardText(text);
+    await navigator.clipboard.writeText(cleaned).catch(() => {});
     setCopiedKey(key);
     if (label) {
       notifyAdmin("success", `${label} copied to clipboard`);
@@ -588,6 +591,22 @@ export function AdminOrderDetailClient({
               {activeExport === "word"
                 ? "Building Word (.docx)..."
                 : "Export to Word (.docx)"}
+            </Button>
+
+            <Button
+              asChild
+              variant="default"
+              size="sm"
+              className="bg-[#9E4765] text-white hover:bg-[#8A3B54] shadow-xs"
+            >
+              <a
+                href={`/admin/orders/${order.id}/brief`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print / Save PDF (with Emojis)
+              </a>
             </Button>
 
             <Button
@@ -1062,10 +1081,33 @@ export function AdminOrderDetailClient({
                               : "";
 
                           return (
-                            <div key={field.key} className="space-y-0.5">
-                              <dt className="text-xs font-medium text-[#7A686E]">
-                                {adaptedLabel}
-                              </dt>
+                            <div key={field.key} className="space-y-0.5 group">
+                              <div className="flex items-center justify-between">
+                                <dt className="text-xs font-medium text-[#7A686E]">
+                                  {adaptedLabel}
+                                </dt>
+                                {strVal && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void copyText(
+                                        `field-${field.key}`,
+                                        strVal,
+                                        adaptedLabel
+                                      )
+                                    }
+                                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity inline-flex items-center gap-1 text-[11px] text-[#9E4765] hover:underline cursor-pointer"
+                                    title={`Copy ${adaptedLabel}`}
+                                  >
+                                    {copiedKey === `field-${field.key}` ? (
+                                      <Check className="h-3 w-3 text-[#15803D]" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                    <span className="text-[10px]">Copy</span>
+                                  </button>
+                                )}
+                              </div>
                               <dd className="text-sm text-[#1F1619] whitespace-pre-wrap leading-relaxed">
                                 {strVal || (
                                   <span className="text-xs italic text-[#A39197]">
@@ -1140,6 +1182,21 @@ export function AdminOrderDetailClient({
                       <FileText className="h-4 w-4 text-[#9E4765]" />
                     )}
                     Export Brief to Word (.docx)
+                  </Button>
+                  <Button
+                    asChild
+                    variant="default"
+                    size="sm"
+                    className="w-full justify-start bg-[#9E4765] text-white hover:bg-[#8A3B54]"
+                  >
+                    <a
+                      href={`/admin/orders/${order.id}/brief`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Printer className="h-4 w-4" />
+                      Print / Save PDF (with Emojis)
+                    </a>
                   </Button>
                   <Button
                     type="button"
