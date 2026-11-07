@@ -1,16 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Printer,
   ArrowLeft,
   FileText,
+  FileDown,
   Check,
   Copy,
   Loader2,
   FolderOpen,
-  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +59,12 @@ interface AdminPrintableBriefProps {
   values: Record<string, unknown>;
   photos: PrintablePhotoItem[];
   driveFolderUrl: string;
+  /**
+   * When true the page auto-triggers window.print() after a short delay
+   * and hides the toolbar so only the document is visible in the print dialog.
+   * Activated by opening the page with ?pdf=1.
+   */
+  autoPrint?: boolean;
 }
 
 function triggerBlobDownload(blob: Blob, filename: string) {
@@ -85,9 +90,20 @@ export function AdminPrintableBrief({
   values,
   photos,
   driveFolderUrl,
+  autoPrint = false,
 }: AdminPrintableBriefProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isExportingWord, setIsExportingWord] = useState(false);
+
+  // Auto-print mode: triggered by ?pdf=1 on the URL.
+  // Waits 800ms for fonts/layout to settle, then opens the browser Save-as-PDF dialog.
+  useEffect(() => {
+    if (!autoPrint) return;
+    const t = setTimeout(() => {
+      window.print();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [autoPrint]);
 
   const selectedGender =
     typeof values["subject_gender"] === "string" && values["subject_gender"]
@@ -98,11 +114,7 @@ export function AdminPrintableBrief({
   const coverPhoto = photos.find((p) => p.isCover) ?? photos[0];
   const formattedCreated = new Date(order.createdAt).toLocaleDateString(
     "en-GB",
-    {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }
+    { day: "numeric", month: "long", year: "numeric" }
   );
 
   const copyText = async (key: string, text: string) => {
@@ -110,10 +122,6 @@ export function AdminPrintableBrief({
     await navigator.clipboard.writeText(cleaned).catch(() => {});
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   const handleExportWord = async () => {
@@ -130,8 +138,10 @@ export function AdminPrintableBrief({
         /[^a-zA-Z0-9_-]/g,
         "_"
       );
-      const filename = `${order.reference}-${safeName}-Editorial-Brief.docx`;
-      triggerBlobDownload(blob, filename);
+      triggerBlobDownload(
+        blob,
+        `${order.reference}-${safeName}-Editorial-Brief.docx`
+      );
     } finally {
       setIsExportingWord(false);
     }
@@ -139,71 +149,72 @@ export function AdminPrintableBrief({
 
   return (
     <div className="min-h-screen bg-[#F6EFEB] text-[#1F1619] antialiased print:bg-white print:min-h-0">
-      {/* Top Floating / Sticky Screen Action Toolbar */}
-      <header className="sticky top-0 z-50 print:hidden border-b border-[#E8D8CF] bg-[#1F1619]/95 text-white backdrop-blur-md px-4 sm:px-8 py-3.5 shadow-md">
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="text-[#D9C8C0] hover:text-white hover:bg-white/10 -ml-2"
-            >
-              <Link href={`/admin/orders/${order.id}`}>
-                <ArrowLeft className="h-4 w-4 mr-1.5" />
-                Back to Order
-              </Link>
-            </Button>
-            <div className="h-4 w-px bg-white/20 hidden sm:block" />
-            <span className="font-mono text-xs font-semibold tracking-wider text-[#E8A6BE]">
-              {order.reference}
-            </span>
-            <span className="text-xs text-white/70 hidden sm:inline">
-              {starName}
-            </span>
+      {/* Sticky top toolbar — hidden during printing */}
+      {!autoPrint && (
+        <header className="sticky top-0 z-50 print:hidden border-b border-[#E8D8CF] bg-[#1F1619]/95 text-white backdrop-blur-md px-4 sm:px-8 py-3.5 shadow-md">
+          <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            {/* Left: back + order info */}
+            <div className="flex items-center gap-3">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="text-[#D9C8C0] hover:text-white hover:bg-white/10 -ml-2"
+              >
+                <Link href={`/admin/orders/${order.id}`}>
+                  <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  Back to Order
+                </Link>
+              </Button>
+              <div className="h-4 w-px bg-white/20 hidden sm:block" />
+              <span className="font-mono text-xs font-semibold tracking-wider text-[#E8A6BE]">
+                {order.reference}
+              </span>
+              <span className="text-xs text-white/70 hidden sm:inline">
+                {starName}
+              </span>
+            </div>
+
+            {/* Right: export buttons */}
+            <div className="flex items-center gap-2">
+              {/* Word export */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleExportWord()}
+                disabled={isExportingWord}
+                className="bg-white/5 border-white/20 text-white hover:bg-white/15 hover:text-white"
+              >
+                {isExportingWord ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <FileText className="h-3.5 w-3.5 mr-1.5 text-[#E8A6BE]" />
+                )}
+                Word (.docx)
+              </Button>
+
+              {/* PDF export — opens this same page with ?pdf=1 to auto-print */}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  const url = `/admin/orders/${order.id}/brief?pdf=1`;
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }}
+                className="bg-[#9E4765] hover:bg-[#8A3B54] text-white shadow-xs font-medium cursor-pointer"
+              >
+                <FileDown className="h-3.5 w-3.5 mr-1.5" />
+                PDF (.pdf)
+              </Button>
+            </div>
           </div>
+        </header>
+      )}
 
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void handleExportWord()}
-              disabled={isExportingWord}
-              className="bg-white/5 border-white/20 text-white hover:bg-white/15 hover:text-white"
-            >
-              {isExportingWord ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-              ) : (
-                <FileText className="h-3.5 w-3.5 mr-1.5 text-[#E8A6BE]" />
-              )}
-              Export Word (.docx)
-            </Button>
-
-            <Button
-              type="button"
-              size="sm"
-              onClick={handlePrint}
-              className="bg-[#9E4765] hover:bg-[#8A3B54] text-white shadow-xs font-medium cursor-pointer"
-            >
-              <Printer className="h-3.5 w-3.5 mr-1.5" />
-              Print / Save as PDF
-            </Button>
-          </div>
-        </div>
-
-        {/* Browser Print Engine Tip Bar */}
-        <div className="max-w-5xl mx-auto mt-2 pt-2 border-t border-white/10 flex items-center gap-2 text-[11px] text-[#D9C8C0]">
-          <Info className="h-3.5 w-3.5 text-[#E8A6BE] shrink-0" />
-          <span>
-            <strong>Pro Tip for Vector PDF with Native Emojis:</strong> In the print dialog, choose Destination <strong>Save as PDF</strong>, check <strong>Background graphics</strong>, and set Margins to <strong>Default</strong>. All emojis render in full color with zero character spacing distortion.
-          </span>
-        </div>
-      </header>
-
-      {/* Main Document Body */}
+      {/* Main document */}
       <main className="max-w-4xl mx-auto my-6 sm:my-10 p-6 sm:p-12 bg-white rounded-3xl shadow-[0_12px_45px_-12px_rgba(31,22,25,0.08)] border border-[#EFE6E0] print:border-none print:shadow-none print:m-0 print:p-0 print:max-w-none print:rounded-none">
-        {/* Document Masthead */}
+        {/* Masthead */}
         <header className="border-b-2 border-[#1F1619] pb-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
@@ -223,15 +234,13 @@ export function AdminPrintableBrief({
               )}
             </div>
 
-            <div className="text-right space-y-1 text-xs">
+            <div className="text-right space-y-1">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#EAD4DF] bg-[#FCF9F7] px-3.5 py-1 text-xs font-semibold text-[#9E4765]">
                 <span>{order.reference}</span>
                 <span>•</span>
                 <span>{formatOrderStatusLabel(order.status)}</span>
               </div>
-              <p className="text-[#8C7A80]">
-                Prepared on {formattedCreated}
-              </p>
+              <p className="text-xs text-[#8C7A80]">Prepared on {formattedCreated}</p>
             </div>
           </div>
 
@@ -247,22 +256,20 @@ export function AdminPrintableBrief({
           )}
         </header>
 
-        {/* Specifications & Overview Grid */}
+        {/* Specifications grid */}
         <section className="my-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-[#FCF9F7] border border-[#F0E6E0] text-xs print:bg-white print:border-[#EAE0DA]">
           <div className="space-y-1">
             <span className="font-bold uppercase tracking-wider text-[#8C7A80] text-[10px] block">
               Featured Star
             </span>
-            <p className="font-medium text-[#1F1619] text-sm">
-              {starName}
-            </p>
+            <p className="font-medium text-[#1F1619] text-sm">{starName}</p>
             <p className="text-[#7A686E]">
-              {order.ageTurning ? `Turning ${order.ageTurning} years old` : "Milestone Celebration"}
+              {order.ageTurning
+                ? `Turning ${order.ageTurning} years old`
+                : "Milestone Celebration"}
             </p>
             {order.birthdayDate && (
-              <p className="text-[#7A686E]">
-                Birthday: {order.birthdayDate}
-              </p>
+              <p className="text-[#7A686E]">Birthday: {order.birthdayDate}</p>
             )}
           </div>
 
@@ -277,9 +284,7 @@ export function AdminPrintableBrief({
               Relationship: {order.relationship || "Special Friend"}
             </p>
             {order.email && (
-              <p className="text-[#7A686E] truncate">
-                {order.email}
-              </p>
+              <p className="text-[#7A686E] truncate">{order.email}</p>
             )}
           </div>
 
@@ -290,12 +295,8 @@ export function AdminPrintableBrief({
             <p className="font-medium text-[#1F1619] text-sm">
               {order.colourTheme || "Editorial Classic Rose"}
             </p>
-            <p className="text-[#7A686E]">
-              Target Gender: {selectedGender}
-            </p>
-            <p className="text-[#7A686E]">
-              Format: Standard A4 Magazine
-            </p>
+            <p className="text-[#7A686E]">Target Gender: {selectedGender}</p>
+            <p className="text-[#7A686E]">Format: Standard A4 Magazine</p>
           </div>
 
           <div className="space-y-1">
@@ -324,7 +325,7 @@ export function AdminPrintableBrief({
           </div>
         </section>
 
-        {/* Chapters Content */}
+        {/* Chapters */}
         <div className="space-y-8 mt-8">
           {FORM_PAGES.map((page) => {
             // Chapter 7: Photos Manifest
@@ -393,14 +394,20 @@ export function AdminPrintableBrief({
                             <th className="py-2.5 px-3">Photo File</th>
                             <th className="py-2.5 px-3 w-20">Type</th>
                             <th className="py-2.5 px-3 w-20">Size</th>
-                            <th className="py-2.5 px-3">Caption Written by Customer</th>
+                            <th className="py-2.5 px-3">
+                              Caption Written by Customer
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F3ECE7]">
                           {photos.map((photo, idx) => (
                             <tr
                               key={photo.id}
-                              className={photo.isCover ? "bg-[#FFF9FA]" : "hover:bg-[#FCF9F7]"}
+                              className={
+                                photo.isCover
+                                  ? "bg-[#FFF9FA]"
+                                  : "hover:bg-[#FCF9F7]"
+                              }
                             >
                               <td className="py-2 px-3 text-center font-mono text-[#A39197]">
                                 {idx + 1}
@@ -438,7 +445,7 @@ export function AdminPrintableBrief({
               );
             }
 
-            // Question Chapters
+            // Question chapters
             const populatedGroups = page.groups
               .map((group) => {
                 const answeredFields = group.fields
@@ -448,9 +455,8 @@ export function AdminPrintableBrief({
                       if (
                         values[field.conditional.fieldKey] !==
                         field.conditional.equals
-                      ) {
+                      )
                         return false;
-                      }
                     }
                     return getFormattedFieldLines(field, values).length > 0;
                   })
@@ -458,7 +464,6 @@ export function AdminPrintableBrief({
                     key: field.key,
                     label: adaptCopyByGender(field.label, selectedGender),
                     lines: getFormattedFieldLines(field, values),
-                    type: field.type,
                   }));
 
                 return {
@@ -469,27 +474,33 @@ export function AdminPrintableBrief({
               })
               .filter((g) => g.fields.length > 0);
 
-            if (populatedGroups.length === 0) {
-              return null;
-            }
+            if (populatedGroups.length === 0) return null;
 
             return (
               <section
                 key={page.id}
                 className="space-y-5 print-avoid-break pt-5 border-t border-[#F0E6E0]"
               >
-                {/* Chapter Banner */}
+                {/* Chapter banner */}
                 <div className="rounded-xl bg-[#F6EBF0] px-4 py-2.5 flex items-center justify-between border-l-4 border-[#9E4765]">
                   <div>
                     <span className="text-[10px] uppercase font-bold tracking-widest text-[#9E4765]">
-                      Chapter {page.pageNumber} • {adaptCopyByGender(page.subtitle || "Editorial Section", selectedGender)}
+                      Chapter {page.pageNumber} •{" "}
+                      {adaptCopyByGender(
+                        page.subtitle || "Editorial Section",
+                        selectedGender
+                      )}
                     </span>
                     <h2 className="font-serif text-lg font-bold text-[#1F1619]">
                       {adaptCopyByGender(page.title, selectedGender)}
                     </h2>
                   </div>
                   <Badge variant="outline" className="text-xs bg-white">
-                    {populatedGroups.reduce((acc, g) => acc + g.fields.length, 0)} Answers
+                    {populatedGroups.reduce(
+                      (acc, g) => acc + g.fields.length,
+                      0
+                    )}{" "}
+                    Answers
                   </Badge>
                 </div>
 
@@ -509,7 +520,8 @@ export function AdminPrintableBrief({
                           onClick={() => {
                             const formatted = group.fields
                               .map(
-                                (f) => `**${f.label}:**\n${f.lines.join("\n")}`
+                                (f) =>
+                                  `**${f.label}:**\n${f.lines.join("\n")}`
                               )
                               .join("\n\n");
                             void copyText(`grp-${group.id}`, formatted);
@@ -549,7 +561,6 @@ export function AdminPrintableBrief({
                                   )
                                 }
                                 className="print:hidden opacity-0 group-hover/field:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-[#9E4765] hover:underline cursor-pointer"
-                                title="Copy answer"
                               >
                                 {copiedKey === field.key ? (
                                   <Check className="h-3 w-3 text-[#15803D]" />
@@ -578,7 +589,7 @@ export function AdminPrintableBrief({
           })}
         </div>
 
-        {/* Document Footer */}
+        {/* Footer */}
         <footer className="mt-12 pt-6 border-t border-[#EAE0DA] text-center space-y-1 text-xs text-[#8C7A80] print:mt-8">
           <div className="flex items-center justify-center gap-2">
             <BoboStudioTag variant="flower" className="h-3.5 w-3.5" />
@@ -587,35 +598,29 @@ export function AdminPrintableBrief({
             </span>
           </div>
           <p className="text-[10px] text-[#A39197]">
-            Confidential Editorial Production Document for Order {order.reference} • All Rights Reserved
+            Confidential Editorial Production Document for Order{" "}
+            {order.reference} • All Rights Reserved
           </p>
         </footer>
       </main>
 
-      {/* Global Print Stylesheet */}
+      {/* Print CSS */}
       <style jsx global>{`
         @media print {
           @page {
             size: A4 portrait;
             margin: 12mm 15mm 15mm 15mm;
           }
-          html, body {
-            background-color: #FFFFFF !important;
-            color: #1F1619 !important;
+          html,
+          body {
+            background-color: #ffffff !important;
+            color: #1f1619 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-          }
-          .print\\:hidden,
-          header.sticky {
-            display: none !important;
           }
           .print-avoid-break {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
-          }
-          .print-chapter-break {
-            break-before: page !important;
-            page-break-before: always !important;
           }
         }
       `}</style>

@@ -10,10 +10,12 @@ import { AdminPrintableBrief } from "@/components/admin/admin-printable-brief";
 
 interface AdminPrintableBriefPageProps {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function AdminPrintableBriefPage({
   params,
+  searchParams,
 }: AdminPrintableBriefPageProps) {
   const adminEmail = await getAuthenticatedAdminEmail();
   if (!adminEmail) {
@@ -21,6 +23,10 @@ export default async function AdminPrintableBriefPage({
   }
 
   const { orderId } = await params;
+  const sp = await searchParams;
+  // ?pdf=1 triggers auto-print mode in the client component
+  const autoPrint = sp["pdf"] === "1";
+
   await ensureDbReady();
 
   const isUuid =
@@ -116,6 +122,7 @@ export default async function AdminPrintableBriefPage({
         uploadedAt: p.uploadedAt.toISOString(),
       }))}
       driveFolderUrl={driveFolderUrl}
+      autoPrint={autoPrint}
     />
   );
 }
