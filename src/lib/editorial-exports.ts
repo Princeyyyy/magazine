@@ -650,11 +650,16 @@ function getEmojiPngDataUrl(emoji: string): string | null {
   }
 }
 
+interface LayoutCursor {
+  y: number;
+}
+
 interface RenderRichTextOptions {
   fontSize?: number;
   lineHeight?: number;
   textColor?: [number, number, number];
   fontStyle?: "normal" | "bold" | "italic" | "bolditalic";
+  cursor: LayoutCursor;
   ensureSpace: (pt: number) => void;
 }
 
@@ -665,34 +670,37 @@ interface RenderRichTextOptions {
  *
  * This completely avoids jsPDF's WinAnsi 16-bit encoding switch which injected
  * null-byte spacing ('p e r s o n') and corrupted emojis into 'Ø=Þ'.
+ * All line rendering updates cursor.y synchronously so that page breaks across
+ * paragraphs, questions, and repeatable rows stay perfectly synchronized.
  */
 function renderRichParagraphWithEmojis(
   doc: jsPDF,
   rawText: string,
   startX: number,
-  startY: number,
   maxWidth: number,
   options: RenderRichTextOptions
-): number {
-  const sanitized = cleanXmlControlChars(rawText);
-  if (!sanitized) return startY;
+): void {
+  const sanitized = cleanXmlControlChars(rawText)
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  if (!sanitized) return;
 
   const fontSize = options.fontSize ?? 10.5;
   const lineHeight = options.lineHeight ?? fontSize * 1.35;
   const fontStyle = options.fontStyle ?? "normal";
   const [r, g, b] = options.textColor ?? [31, 22, 25];
+  const { cursor, ensureSpace } = options;
 
   doc.setFont("times", fontStyle);
   doc.setFontSize(fontSize);
   doc.setTextColor(r, g, b);
 
-  let y = startY;
   const paragraphs = sanitized.split("\n");
 
   for (const para of paragraphs) {
     if (para.trim() === "") {
-      y += lineHeight * 0.6;
-      options.ensureSpace(lineHeight);
+      cursor.y += lineHeight * 0.6;
+      ensureSpace(lineHeight);
       continue;
     }
 
@@ -734,22 +742,33 @@ function renderRichParagraphWithEmojis(
 
     const flushLine = () => {
       if (lineTokens.length === 0) return;
-      options.ensureSpace(lineHeight);
+      ensureSpace(lineHeight);
       let curX = startX;
 
       doc.setFont("times", fontStyle);
       doc.setFontSize(fontSize);
       doc.setTextColor(r, g, b);
 
+      // Coalesce consecutive text and space tokens into single text runs for cleaner PDF text rendering
+      let pendingText = "";
+
+      const flushPendingText = () => {
+        if (pendingText) {
+          doc.text(pendingText, curX, cursor.y);
+          curX += doc.getTextWidth(pendingText);
+          pendingText = "";
+        }
+      };
+
       for (const token of lineTokens) {
         if (token.type === "text" || token.type === "space") {
-          doc.text(token.text, curX, y);
-          curX += token.width;
+          pendingText += token.text;
         } else if (token.type === "emoji") {
+          flushPendingText();
           const emojiImg = getEmojiPngDataUrl(token.text);
           if (emojiImg) {
             const emojiSize = fontSize * 1.05;
-            const emojiY = y - fontSize * 0.82;
+            const emojiY = cursor.y - fontSize * 0.82;
             try {
               doc.addImage(emojiImg, "PNG", curX, emojiY, emojiSize, emojiSize);
             } catch {
@@ -759,8 +778,9 @@ function renderRichParagraphWithEmojis(
           curX += token.width;
         }
       }
+      flushPendingText();
 
-      y += lineHeight;
+      cursor.y += lineHeight;
       lineTokens = [];
       currentLineWidth = 0;
     };
@@ -781,10 +801,8 @@ function renderRichParagraphWithEmojis(
     }
 
     flushLine();
-    y += 2; // Subtle inter-paragraph spacing
+    cursor.y += 2; // Subtle inter-paragraph spacing
   }
-
-  return y;
 }
 
 export function generateOrderPdfBlob(
@@ -811,7 +829,7 @@ export function generateOrderPdfBlob(
   const pageHeight = doc.internal.pageSize.getHeight();
   const marginX = 48;
   const contentWidth = pageWidth - marginX * 2;
-  let y = 56;
+  const cursor: LayoutCursor = { y: 56 };
 
   const drawPageBackgroundAndHeader = (isFirstPage: boolean) => {
     // Soft editorial cream page background
@@ -834,12 +852,12 @@ export function generateOrderPdfBlob(
       doc.setDrawColor(235, 224, 216);
       doc.setLineWidth(0.5);
       doc.line(marginX, 40, pageWidth - marginX, 40);
-      y = 62;
+      cursor.y = 62;
     }
   };
 
   const ensureSpace = (neededPt: number) => {
-    if (y + neededPt > pageHeight - 52) {
+    if (cursor.y + neededPt > pageHeight - 52) {
       doc.addPage();
       drawPageBackgroundAndHeader(false);
     }
@@ -851,34 +869,34 @@ export function generateOrderPdfBlob(
   doc.setFont("times", "bold");
   doc.setFontSize(10);
   doc.setTextColor(158, 71, 101);
-  doc.text("CUSTOM MAGAZINE  •  BESPOKE EDITORIAL BRIEF", marginX, y);
-  y += 26;
+  doc.text("CUSTOM MAGAZINE  •  BESPOKE EDITORIAL BRIEF", marginX, cursor.y);
+  cursor.y += 26;
 
   doc.setFont("times", "normal");
   doc.setFontSize(28);
   doc.setTextColor(31, 22, 25);
-  doc.text(starName, marginX, y);
-  y += 18;
+  doc.text(starName, marginX, cursor.y);
+  cursor.y += 18;
 
   if (order.coverHeadline) {
     ensureSpace(28);
-    y = renderRichParagraphWithEmojis(
+    renderRichParagraphWithEmojis(
       doc,
       `“${order.coverHeadline}”`,
       marginX,
-      y,
       contentWidth,
       {
         fontSize: 13,
         lineHeight: 17,
         textColor: [110, 90, 97],
         fontStyle: "italic",
+        cursor,
         ensureSpace,
       }
     );
-    y += 8;
+    cursor.y += 8;
   } else {
-    y += 8;
+    cursor.y += 8;
   }
 
   // Summary Box
@@ -905,9 +923,9 @@ export function generateOrderPdfBlob(
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(231, 218, 210);
   doc.setLineWidth(0.8);
-  doc.roundedRect(marginX, y, contentWidth, boxHeight, 8, 8, "FD");
+  doc.roundedRect(marginX, cursor.y, contentWidth, boxHeight, 8, 8, "FD");
 
-  let sy = y + 20;
+  let sy = cursor.y + 20;
   for (const [k, v] of summaryItems) {
     doc.setFont("times", "bold");
     doc.setFontSize(9.5);
@@ -922,7 +940,7 @@ export function generateOrderPdfBlob(
     sy += 14.5;
   }
 
-  y += boxHeight + 18;
+  cursor.y += boxHeight + 18;
 
   // Iterate through all 9 sections
   for (const page of FORM_PAGES) {
@@ -938,12 +956,12 @@ export function generateOrderPdfBlob(
         continue;
       }
 
-      ensureSpace(75);
-      y += 10;
+      ensureSpace(95);
+      cursor.y += 10;
 
       // Section Banner
       doc.setFillColor(246, 235, 240);
-      doc.roundedRect(marginX, y, contentWidth, 38, 6, 6, "F");
+      doc.roundedRect(marginX, cursor.y, contentWidth, 38, 6, 6, "F");
 
       doc.setFont("times", "italic");
       doc.setFontSize(9);
@@ -951,23 +969,23 @@ export function generateOrderPdfBlob(
       doc.text(
         `Chapter ${page.pageNumber} — ${pageSubtitle}`,
         marginX + 12,
-        y + 14
+        cursor.y + 14
       );
 
       doc.setFont("times", "bold");
       doc.setFontSize(14);
       doc.setTextColor(31, 22, 25);
-      doc.text(pageTitle, marginX + 12, y + 30);
+      doc.text(pageTitle, marginX + 12, cursor.y + 30);
 
-      y += 52;
+      cursor.y += 52;
 
       if (driveFolderUrl) {
         ensureSpace(40);
         doc.setFont("times", "bold");
         doc.setFontSize(10);
         doc.setTextColor(122, 46, 72);
-        doc.text("Google Drive Order Folder:", marginX, y);
-        y += 14;
+        doc.text("Google Drive Order Folder:", marginX, cursor.y);
+        cursor.y += 14;
 
         doc.setFont("times", "normal");
         doc.setFontSize(9.5);
@@ -976,8 +994,8 @@ export function generateOrderPdfBlob(
           driveFolderUrl,
           contentWidth
         ) as string[];
-        doc.text(urlLines, marginX, y);
-        y += urlLines.length * 13 + 8;
+        doc.text(urlLines, marginX, cursor.y);
+        cursor.y += urlLines.length * 13 + 8;
       }
 
       if (fallbackLink) {
@@ -985,8 +1003,8 @@ export function generateOrderPdfBlob(
         doc.setFont("times", "bold");
         doc.setFontSize(10);
         doc.setTextColor(122, 46, 72);
-        doc.text("Shared Photo Link Fallback:", marginX, y);
-        y += 14;
+        doc.text("Shared Photo Link Fallback:", marginX, cursor.y);
+        cursor.y += 14;
 
         doc.setFont("times", "normal");
         doc.setFontSize(9.5);
@@ -995,8 +1013,8 @@ export function generateOrderPdfBlob(
           fallbackLink,
           contentWidth
         ) as string[];
-        doc.text(fbLines, marginX, y);
-        y += fbLines.length * 13 + 8;
+        doc.text(fbLines, marginX, cursor.y);
+        cursor.y += fbLines.length * 13 + 8;
       }
 
       if (coverPhoto) {
@@ -1007,9 +1025,9 @@ export function generateOrderPdfBlob(
         doc.text(
           `Selected Cover Photo: ${coverPhoto.originalName}${coverPhoto.caption ? ` — "${coverPhoto.caption}"` : ""}`,
           marginX,
-          y
+          cursor.y
         );
-        y += 18;
+        cursor.y += 18;
       }
 
       for (let i = 0; i < photos.length; i++) {
@@ -1019,21 +1037,21 @@ export function generateOrderPdfBlob(
         const fullLine = `${prefix}${captionPart}`;
 
         ensureSpace(18);
-        y = renderRichParagraphWithEmojis(
+        renderRichParagraphWithEmojis(
           doc,
           fullLine,
           marginX + 8,
-          y,
           contentWidth - 16,
           {
             fontSize: 9.5,
             lineHeight: 13.5,
             textColor: [45, 34, 38],
             fontStyle: "normal",
+            cursor,
             ensureSpace,
           }
         );
-        y += 2;
+        cursor.y += 2;
       }
       continue;
     }
@@ -1067,12 +1085,12 @@ export function generateOrderPdfBlob(
       continue;
     }
 
-    ensureSpace(75);
-    y += 10;
+    ensureSpace(95);
+    cursor.y += 10;
 
     // Section Banner
     doc.setFillColor(246, 235, 240);
-    doc.roundedRect(marginX, y, contentWidth, 38, 6, 6, "F");
+    doc.roundedRect(marginX, cursor.y, contentWidth, 38, 6, 6, "F");
 
     doc.setFont("times", "italic");
     doc.setFontSize(9);
@@ -1080,54 +1098,55 @@ export function generateOrderPdfBlob(
     doc.text(
       `Chapter ${page.pageNumber} — ${pageSubtitle}`,
       marginX + 12,
-      y + 14
+      cursor.y + 14
     );
 
     doc.setFont("times", "bold");
     doc.setFontSize(14);
     doc.setTextColor(31, 22, 25);
-    doc.text(pageTitle, marginX + 12, y + 30);
+    doc.text(pageTitle, marginX + 12, cursor.y + 30);
 
-    y += 52;
+    cursor.y += 52;
 
     for (const group of populatedGroups) {
-      ensureSpace(40);
+      ensureSpace(45);
       doc.setFont("times", "bolditalic");
       doc.setFontSize(12);
       doc.setTextColor(122, 46, 72);
-      doc.text(group.title, marginX, y);
-      y += 6;
+      doc.text(group.title, marginX, cursor.y);
+      cursor.y += 6;
       doc.setDrawColor(235, 224, 216);
       doc.setLineWidth(0.5);
-      doc.line(marginX, y, pageWidth - marginX, y);
-      y += 14;
+      doc.line(marginX, cursor.y, pageWidth - marginX, cursor.y);
+      cursor.y += 14;
 
       for (const field of group.fields) {
-        ensureSpace(28);
+        const labelLines = doc.splitTextToSize(field.label, contentWidth) as string[];
+        ensureSpace(labelLines.length * 13 + 18);
 
         doc.setFont("times", "bold");
         doc.setFontSize(10);
         doc.setTextColor(92, 73, 80);
-        doc.text(field.label, marginX, y);
-        y += 13;
+        doc.text(labelLines, marginX, cursor.y);
+        cursor.y += labelLines.length * 13 + 3;
 
         for (const ans of field.lines) {
-          y = renderRichParagraphWithEmojis(
+          renderRichParagraphWithEmojis(
             doc,
             ans,
             marginX + 10,
-            y,
             contentWidth - 16,
             {
               fontSize: 10.5,
               lineHeight: 14,
               textColor: [31, 22, 25],
               fontStyle: "normal",
+              cursor,
               ensureSpace,
             }
           );
         }
-        y += 6;
+        cursor.y += 6;
       }
     }
   }
