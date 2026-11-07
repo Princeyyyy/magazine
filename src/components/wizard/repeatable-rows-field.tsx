@@ -143,7 +143,7 @@ export function RepeatableRowsField({
                         cellErr ? "border-[#B91C1C]" : undefined
                       )}
                     />
-                    {val.length > 0 && (
+                    {val.length > 0 && singleSf.maxLength !== undefined && (
                       <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-[#A39197]">
                         {val.length}/{singleSf.maxLength}
                       </span>
@@ -212,9 +212,14 @@ export function RepeatableRowsField({
                         <Label className="text-xs font-medium text-[#5C4950]">
                           {adaptedSubLabel}
                         </Label>
-                        {val.length > 0 && (
+                        {val.length > 0 && sf.maxLength !== undefined && (
                           <span className="text-[11px] text-[#A39197]">
                             {val.length}/{sf.maxLength}
+                          </span>
+                        )}
+                        {val.length > 0 && sf.maxLength === undefined && (
+                          <span className="text-[11px] text-[#A39197]">
+                            {val.length} chars
                           </span>
                         )}
                       </div>

@@ -13,6 +13,7 @@ import { getSectionIcon } from "@/components/icons/SectionIcons";
 import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 import {
   generateOrderWordBlob,
+  generateOrderPdfBlob,
   formatOrderStatusLabel,
   hasAnyAnswerInOrder,
 } from "@/lib/editorial-exports";
@@ -167,9 +168,9 @@ export function AdminOrderDetailClient({
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [activeExport, setActiveExport] = useState<"zip" | "word" | null>(
-    null
-  );
+  const [activeExport, setActiveExport] = useState<
+    "zip" | "word" | "pdf" | null
+  >(null);
 
   const selectedGender =
     typeof values["subject_gender"] === "string" && values["subject_gender"]
@@ -303,15 +304,40 @@ export function AdminOrderDetailClient({
     }
   };
 
-  const handleExportPdf = () => {
-    // Opens the printable brief in a new tab with ?pdf=1 which auto-triggers
-    // window.print() — the browser's native print engine renders full color
-    // emojis (Segoe UI Emoji / Apple Color Emoji) with zero corruption.
-    window.open(
-      `/admin/orders/${order.id}/brief?pdf=1`,
-      "_blank",
-      "noopener,noreferrer"
+  const handleExportPdf = async () => {
+    if (activeExport) return;
+    setActiveExport("pdf");
+    notifyAdmin(
+      "loading",
+      "Generating Editorial PDF...",
+      `Typesetting all 9 chapters & photo manifest with emojis for ${order.herName || order.reference}`
     );
+    try {
+      await new Promise((r) => setTimeout(r, 60)); // allow toast to render
+      const blob = generateOrderPdfBlob(
+        order,
+        values,
+        photos,
+        driveFolderUrl
+      );
+      const safeName = (order.herName || "Magazine")
+        .replace(/[^a-zA-Z0-9_-]/g, "_");
+      const filename = `${order.reference}-${safeName}-Editorial-Brief.pdf`;
+      triggerBlobDownload(blob, filename);
+      notifyAdmin(
+        "success",
+        "Editorial PDF Exported",
+        `Downloaded ${filename}`
+      );
+    } catch (err) {
+      notifyAdmin(
+        "error",
+        "PDF Export Failed",
+        err instanceof Error ? err.message : "Could not generate .pdf file."
+      );
+    } finally {
+      setActiveExport(null);
+    }
   };
 
   const handleDownloadPhotosZip = async () => {
@@ -567,11 +593,16 @@ export function AdminOrderDetailClient({
               type="button"
               variant="default"
               size="sm"
+              disabled={activeExport !== null}
               className="bg-[#9E4765] text-white hover:bg-[#8A3B54] shadow-xs"
-              onClick={handleExportPdf}
+              onClick={() => void handleExportPdf()}
             >
-              <FileDown className="h-3.5 w-3.5" />
-              PDF (.pdf)
+              {activeExport === "pdf" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileDown className="h-3.5 w-3.5" />
+              )}
+              {activeExport === "pdf" ? "Building PDF..." : "PDF (.pdf)"}
             </Button>
           </div>
         )}
@@ -1136,11 +1167,16 @@ export function AdminOrderDetailClient({
                     type="button"
                     variant="default"
                     size="sm"
+                    disabled={activeExport !== null}
                     className="w-full justify-start bg-[#9E4765] text-white hover:bg-[#8A3B54]"
-                    onClick={handleExportPdf}
+                    onClick={() => void handleExportPdf()}
                   >
-                    <FileDown className="h-4 w-4" />
-                    PDF (.pdf)
+                    {activeExport === "pdf" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileDown className="h-4 w-4" />
+                    )}
+                    {activeExport === "pdf" ? "Building PDF..." : "Export to PDF (.pdf)"}
                   </Button>
                 </div>
               </>

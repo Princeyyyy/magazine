@@ -510,6 +510,15 @@ describe("Form Configuration & Generated Zod Schemas", () => {
         ],
       });
       expect(validResult.success).toBe(true);
+
+      // Long messages without character limits are accepted
+      const longNote = "To our dearest friend, ".repeat(80); // ~1840 characters
+      const longResult = page9Schema.safeParse({
+        messages_from_loved_ones: [
+          { name: "Auntie Grace & Uncle David", note: longNote },
+        ],
+      });
+      expect(longResult.success).toBe(true);
     });
   });
 

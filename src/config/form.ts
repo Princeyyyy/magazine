@@ -193,7 +193,7 @@ export interface SubFieldConfig {
   key: string;
   label: string;
   placeholder?: string;
-  maxLength: number;
+  maxLength?: number;
   type?: "shortText" | "longText";
 }
 
@@ -1136,13 +1136,12 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 key: "name",
                 label: "Name & relationship",
                 placeholder: "e.g. Auntie Grace / Chloe (Uni bestie)",
-                maxLength: 80,
+                maxLength: 120,
               },
               {
                 key: "note",
                 label: "Their message for her",
                 placeholder: "Write their tribute or letter here...",
-                maxLength: 400,
                 type: "longText",
               },
             ],
@@ -1422,14 +1421,14 @@ export function buildFieldZodSchema(field: FieldConfig): z.ZodTypeAny {
     case "repeatableRows": {
       const rowShape: Record<string, z.ZodTypeAny> = {};
       for (const sub of field.subFields) {
-        rowShape[sub.key] = z
-          .string()
-          .trim()
-          .max(
+        let fieldSchema = z.string().trim();
+        if (sub.maxLength !== undefined) {
+          fieldSchema = fieldSchema.max(
             sub.maxLength,
             `${sub.label} must be ${sub.maxLength} characters or fewer.`
-          )
-          .default("");
+          );
+        }
+        rowShape[sub.key] = fieldSchema.default("");
       }
       const rowObjectSchema = z.object(rowShape);
 

@@ -17,6 +17,7 @@ import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
 import { FORM_PAGES, adaptCopyByGender } from "@/config/form";
 import {
   generateOrderWordBlob,
+  generateOrderPdfBlob,
   getFormattedFieldLines,
   formatOrderStatusLabel,
 } from "@/lib/editorial-exports";
@@ -94,9 +95,9 @@ export function AdminPrintableBrief({
 }: AdminPrintableBriefProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isExportingWord, setIsExportingWord] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-  // Auto-print mode: triggered by ?pdf=1 on the URL.
-  // Waits 800ms for fonts/layout to settle, then opens the browser Save-as-PDF dialog.
+  // Optional auto-print mode if opened with ?print=1
   useEffect(() => {
     if (!autoPrint) return;
     const t = setTimeout(() => {
@@ -147,6 +148,29 @@ export function AdminPrintableBrief({
     }
   };
 
+  const handleExportPdf = () => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      const blob = generateOrderPdfBlob(
+        order,
+        values,
+        photos,
+        driveFolderUrl
+      );
+      const safeName = (order.herName || "Magazine").replace(
+        /[^a-zA-Z0-9_-]/g,
+        "_"
+      );
+      triggerBlobDownload(
+        blob,
+        `${order.reference}-${safeName}-Editorial-Brief.pdf`
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F6EFEB] text-[#1F1619] antialiased print:bg-white print:min-h-0">
       {/* Sticky top toolbar — hidden during printing */}
@@ -194,17 +218,19 @@ export function AdminPrintableBrief({
                 Word (.docx)
               </Button>
 
-              {/* PDF export — opens this same page with ?pdf=1 to auto-print */}
+              {/* PDF export */}
               <Button
                 type="button"
                 size="sm"
-                onClick={() => {
-                  const url = `/admin/orders/${order.id}/brief?pdf=1`;
-                  window.open(url, "_blank", "noopener,noreferrer");
-                }}
+                onClick={handleExportPdf}
+                disabled={isExportingPdf}
                 className="bg-[#9E4765] hover:bg-[#8A3B54] text-white shadow-xs font-medium cursor-pointer"
               >
-                <FileDown className="h-3.5 w-3.5 mr-1.5" />
+                {isExportingPdf ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <FileDown className="h-3.5 w-3.5 mr-1.5" />
+                )}
                 PDF (.pdf)
               </Button>
             </div>

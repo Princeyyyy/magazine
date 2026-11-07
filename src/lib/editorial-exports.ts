@@ -15,7 +15,11 @@ import {
 } from "docx";
 import { jsPDF } from "jspdf";
 import { FORM_PAGES, adaptCopyByGender, type FieldConfig } from "@/config/form";
-import { splitTextAndEmojis, cleanXmlControlChars } from "@/lib/editorial-text";
+import {
+  splitTextAndEmojis,
+  cleanXmlControlChars,
+  EMOJI_REGEX,
+} from "@/lib/editorial-text";
 
 export interface CreateTextRunsOptions {
   font?: string;
@@ -606,6 +610,183 @@ export async function generateOrderWordBlob(
 // ============================================================================
 // 2. PDF (.PDF) EDITORIAL EXPORT
 // ============================================================================
+
+const emojiCanvasCache = new Map<string, string>();
+
+/**
+ * Renders an emoji glyph onto an off-screen HTML5 canvas using the system's
+ * native color emoji font ('Segoe UI Emoji' / 'Apple Color Emoji') and
+ * returns a PNG data URL suitable for jsPDF.addImage.
+ *
+ * In headless / Node.js test environments, returns a 1x1 transparent PNG.
+ */
+function getEmojiPngDataUrl(emoji: string): string | null {
+  if (typeof document === "undefined") {
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  }
+  if (emojiCanvasCache.has(emoji)) {
+    return emojiCanvasCache.get(emoji)!;
+  }
+
+  try {
+    const canvas = document.createElement("canvas");
+    const size = 64; // High resolution 64x64 for crisp print quality
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.font = '48px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(emoji, size / 2, size / 2 + 2);
+
+    const dataUrl = canvas.toDataURL("image/png");
+    emojiCanvasCache.set(emoji, dataUrl);
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
+interface RenderRichTextOptions {
+  fontSize?: number;
+  lineHeight?: number;
+  textColor?: [number, number, number];
+  fontStyle?: "normal" | "bold" | "italic" | "bolditalic";
+  ensureSpace: (pt: number) => void;
+}
+
+/**
+ * Renders text containing Unicode emojis into a jsPDF document by:
+ * 1. Drawing prose text segments natively as 100% vector, selectable text.
+ * 2. Drawing emoji segments as crisp, inline color PNG images right next to words.
+ *
+ * This completely avoids jsPDF's WinAnsi 16-bit encoding switch which injected
+ * null-byte spacing ('p e r s o n') and corrupted emojis into 'Ø=Þ'.
+ */
+function renderRichParagraphWithEmojis(
+  doc: jsPDF,
+  rawText: string,
+  startX: number,
+  startY: number,
+  maxWidth: number,
+  options: RenderRichTextOptions
+): number {
+  const sanitized = cleanXmlControlChars(rawText);
+  if (!sanitized) return startY;
+
+  const fontSize = options.fontSize ?? 10.5;
+  const lineHeight = options.lineHeight ?? fontSize * 1.35;
+  const fontStyle = options.fontStyle ?? "normal";
+  const [r, g, b] = options.textColor ?? [31, 22, 25];
+
+  doc.setFont("times", fontStyle);
+  doc.setFontSize(fontSize);
+  doc.setTextColor(r, g, b);
+
+  let y = startY;
+  const paragraphs = sanitized.split("\n");
+
+  for (const para of paragraphs) {
+    if (para.trim() === "") {
+      y += lineHeight * 0.6;
+      options.ensureSpace(lineHeight);
+      continue;
+    }
+
+    const segments = splitTextAndEmojis(para);
+    type Token =
+      | { type: "text"; text: string; width: number }
+      | { type: "space"; text: string; width: number }
+      | { type: "emoji"; text: string; width: number };
+
+    const tokens: Token[] = [];
+    const emojiRegex = new RegExp(EMOJI_REGEX.source, "gu");
+
+    for (const seg of segments) {
+      if (seg.isEmoji) {
+        const matched = seg.text.match(emojiRegex) || [seg.text];
+        for (const em of matched) {
+          tokens.push({
+            type: "emoji",
+            text: em,
+            width: fontSize * 1.15,
+          });
+        }
+      } else {
+        const parts = seg.text.split(/(\s+)/);
+        for (const part of parts) {
+          if (!part) continue;
+          const w = doc.getTextWidth(part);
+          if (/^\s+$/.test(part)) {
+            tokens.push({ type: "space", text: part, width: w });
+          } else {
+            tokens.push({ type: "text", text: part, width: w });
+          }
+        }
+      }
+    }
+
+    let lineTokens: Token[] = [];
+    let currentLineWidth = 0;
+
+    const flushLine = () => {
+      if (lineTokens.length === 0) return;
+      options.ensureSpace(lineHeight);
+      let curX = startX;
+
+      doc.setFont("times", fontStyle);
+      doc.setFontSize(fontSize);
+      doc.setTextColor(r, g, b);
+
+      for (const token of lineTokens) {
+        if (token.type === "text" || token.type === "space") {
+          doc.text(token.text, curX, y);
+          curX += token.width;
+        } else if (token.type === "emoji") {
+          const emojiImg = getEmojiPngDataUrl(token.text);
+          if (emojiImg) {
+            const emojiSize = fontSize * 1.05;
+            const emojiY = y - fontSize * 0.82;
+            try {
+              doc.addImage(emojiImg, "PNG", curX, emojiY, emojiSize, emojiSize);
+            } catch {
+              // Gracefully continue if addImage fails
+            }
+          }
+          curX += token.width;
+        }
+      }
+
+      y += lineHeight;
+      lineTokens = [];
+      currentLineWidth = 0;
+    };
+
+    for (const token of tokens) {
+      // Skip leading space on a fresh line
+      if (lineTokens.length === 0 && token.type === "space") {
+        continue;
+      }
+
+      if (currentLineWidth + token.width > maxWidth && lineTokens.length > 0) {
+        flushLine();
+        if (token.type === "space") continue;
+      }
+
+      lineTokens.push(token);
+      currentLineWidth += token.width;
+    }
+
+    flushLine();
+    y += 2; // Subtle inter-paragraph spacing
+  }
+
+  return y;
+}
+
 export function generateOrderPdfBlob(
   order: EditorialExportOrder,
   values: Record<string, unknown>,
@@ -680,15 +861,22 @@ export function generateOrderPdfBlob(
   y += 18;
 
   if (order.coverHeadline) {
-    doc.setFont("times", "italic");
-    doc.setFontSize(13);
-    doc.setTextColor(110, 90, 97);
-    const headlineLines = doc.splitTextToSize(
+    ensureSpace(28);
+    y = renderRichParagraphWithEmojis(
+      doc,
       `“${order.coverHeadline}”`,
-      contentWidth
-    ) as string[];
-    doc.text(headlineLines, marginX, y);
-    y += headlineLines.length * 16 + 8;
+      marginX,
+      y,
+      contentWidth,
+      {
+        fontSize: 13,
+        lineHeight: 17,
+        textColor: [110, 90, 97],
+        fontStyle: "italic",
+        ensureSpace,
+      }
+    );
+    y += 8;
   } else {
     y += 8;
   }
@@ -826,15 +1014,26 @@ export function generateOrderPdfBlob(
 
       for (let i = 0; i < photos.length; i++) {
         const p = photos[i]!;
-        const rawCaption = p.caption ? ` — "${cleanXmlControlChars(p.caption)}"` : " — (No caption)";
-        const line = `${String(i + 1).padStart(2, "0")}. ${p.originalName}${p.isCover ? " [COVER]" : ""}${rawCaption}`;
-        const wrapped = doc.splitTextToSize(line, contentWidth - 12) as string[];
-        ensureSpace(wrapped.length * 13 + 6);
-        doc.setFont("times", "normal");
-        doc.setFontSize(9.5);
-        doc.setTextColor(45, 34, 38);
-        doc.text(wrapped, marginX + 8, y);
-        y += wrapped.length * 13 + 4;
+        const prefix = `${String(i + 1).padStart(2, "0")}. ${p.originalName}${p.isCover ? " [COVER]" : ""}`;
+        const captionPart = p.caption ? ` — “${p.caption}”` : " — (No caption)";
+        const fullLine = `${prefix}${captionPart}`;
+
+        ensureSpace(18);
+        y = renderRichParagraphWithEmojis(
+          doc,
+          fullLine,
+          marginX + 8,
+          y,
+          contentWidth - 16,
+          {
+            fontSize: 9.5,
+            lineHeight: 13.5,
+            textColor: [45, 34, 38],
+            fontStyle: "normal",
+            ensureSpace,
+          }
+        );
+        y += 2;
       }
       continue;
     }
@@ -904,14 +1103,7 @@ export function generateOrderPdfBlob(
       y += 14;
 
       for (const field of group.fields) {
-        const wrappedAnswers: string[] = [];
-        for (const ans of field.lines) {
-          const sanitizedAns = cleanXmlControlChars(ans);
-          const split = doc.splitTextToSize(sanitizedAns, contentWidth - 14) as string[];
-          wrappedAnswers.push(...split);
-        }
-
-        ensureSpace(16 + wrappedAnswers.length * 13 + 10);
+        ensureSpace(28);
 
         doc.setFont("times", "bold");
         doc.setFontSize(10);
@@ -919,11 +1111,23 @@ export function generateOrderPdfBlob(
         doc.text(field.label, marginX, y);
         y += 13;
 
-        doc.setFont("times", "normal");
-        doc.setFontSize(10.5);
-        doc.setTextColor(31, 22, 25);
-        doc.text(wrappedAnswers, marginX + 10, y);
-        y += wrappedAnswers.length * 13.5 + 8;
+        for (const ans of field.lines) {
+          y = renderRichParagraphWithEmojis(
+            doc,
+            ans,
+            marginX + 10,
+            y,
+            contentWidth - 16,
+            {
+              fontSize: 10.5,
+              lineHeight: 14,
+              textColor: [31, 22, 25],
+              fontStyle: "normal",
+              ensureSpace,
+            }
+          );
+        }
+        y += 6;
       }
     }
   }
