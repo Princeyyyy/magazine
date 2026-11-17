@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { google } from "googleapis";
 import { env } from "@/env";
 import { PHOTO_UPLOAD_CONFIG } from "@/config/form";
+import { ValidationError } from "@/lib/errors";
 
 export interface UploadSessionFileMeta {
   fileName: string;
@@ -35,6 +36,15 @@ export interface StoredPhotoInfo {
   sizeBytes: number;
 }
 
+export interface FinalizeUploadOptions {
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  uploadUrl?: string;
+  driveFolderId?: string | null;
+  category?: "solo" | "shared";
+}
+
 export interface PhotoStorageAdapter {
   readonly providerName: "local" | "drive";
   createOrderFolder(orderId: string, label: string): Promise<string>;
@@ -48,7 +58,8 @@ export interface PhotoStorageAdapter {
   finalizeUpload(
     orderId: string,
     sessionId: string,
-    storageFileId?: string
+    storageFileId?: string,
+    options?: FinalizeUploadOptions
   ): Promise<FinalizedPhotoMeta>;
   listPhotos(orderId: string, driveFolderId?: string | null): Promise<StoredPhotoInfo[]>;
   getThumbnail(fileId: string, orderId?: string): Promise<{ buffer: Buffer; mimeType: string }>;
@@ -73,13 +84,30 @@ interface LocalUploadSession {
   createdAt: number;
 }
 
+export interface DriveUploadSession {
+  sessionId: string;
+  orderId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadUrl: string;
+  targetFolderId?: string;
+  category: "solo" | "shared";
+  createdAt: number;
+}
+
 const globalForStorage = globalThis as unknown as {
   localSessions: Map<string, LocalUploadSession> | undefined;
+  driveSessions: Map<string, DriveUploadSession> | undefined;
 };
 
 const localSessions =
   globalForStorage.localSessions ?? new Map<string, LocalUploadSession>();
 globalForStorage.localSessions = localSessions;
+
+const driveSessions =
+  globalForStorage.driveSessions ?? new Map<string, DriveUploadSession>();
+globalForStorage.driveSessions = driveSessions;
 
 export class LocalDiskStorage implements PhotoStorageAdapter {
   readonly providerName = "local" as const;
@@ -203,7 +231,9 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
 
   async finalizeUpload(
     orderId: string,
-    sessionId: string
+    sessionId: string,
+    _storageFileId?: string,
+    _options?: FinalizeUploadOptions
   ): Promise<FinalizedPhotoMeta> {
     const session = localSessions.get(sessionId);
     if (!session || session.orderId !== orderId) {
@@ -516,8 +546,21 @@ export class DriveStorage implements PhotoStorageAdapter {
       throw new Error("Google Drive resumable session did not return a Location header.");
     }
 
+    const sessionId = crypto.randomUUID();
+    driveSessions.set(sessionId, {
+      sessionId,
+      orderId,
+      fileName: fileMeta.fileName,
+      mimeType: fileMeta.mimeType,
+      sizeBytes: fileMeta.sizeBytes,
+      uploadUrl,
+      targetFolderId,
+      category: fileMeta.category || "solo",
+      createdAt: Date.now(),
+    });
+
     return {
-      sessionId: crypto.randomUUID(),
+      sessionId,
       uploadUrl,
       storageProvider: "drive",
       expiresAt: new Date(Date.now() + 3600 * 1000 * 24).toISOString(),
@@ -525,25 +568,133 @@ export class DriveStorage implements PhotoStorageAdapter {
   }
 
   async finalizeUpload(
-    _orderId: string,
-    _sessionId: string,
-    storageFileId?: string
+    orderId: string,
+    sessionId: string,
+    storageFileId?: string,
+    options?: FinalizeUploadOptions
   ): Promise<FinalizedPhotoMeta> {
-    if (!storageFileId) {
-      throw new Error("storageFileId is required to finalize a Google Drive upload.");
+    let resolvedFileId = storageFileId?.trim() || "";
+    const session = driveSessions.get(sessionId);
+
+    const uploadUrl = options?.uploadUrl || session?.uploadUrl;
+    const fileName = options?.fileName || session?.fileName;
+    const fileSize = options?.fileSize ?? session?.sizeBytes;
+    const mimeType = options?.mimeType || session?.mimeType;
+    const targetFolderId = session?.targetFolderId || options?.driveFolderId;
+
+    // If storageFileId was not passed from client (e.g. browser CORS restrictions on Google Drive response body),
+    // self-heal and resolve it using Google Drive resumable status query or Drive searches.
+    if (!resolvedFileId) {
+      const drive = this.getDriveClient();
+
+      // 1. Query upload status directly from Google Drive on the uploadUrl
+      if (uploadUrl) {
+        try {
+          const auth = this.getOAuthClient();
+          const tokenRes = await auth.getAccessToken();
+          const checkRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${tokenRes.token}`,
+              "Content-Range":
+                typeof fileSize === "number" && fileSize > 0
+                  ? `bytes */${fileSize}`
+                  : "bytes */*",
+            },
+          });
+
+          if (checkRes.ok || checkRes.status === 200 || checkRes.status === 201) {
+            const bodyJson = (await checkRes.json().catch(() => ({}))) as {
+              id?: string;
+            };
+            if (bodyJson.id) {
+              resolvedFileId = bodyJson.id;
+            }
+          }
+        } catch (checkErr) {
+          console.warn(
+            "[DriveStorage] Warning checking upload status on uploadUrl:",
+            checkErr
+          );
+        }
+      }
+
+      // 2. Fallback: Search the target Drive folder for the uploaded file by name and orderId
+      if (!resolvedFileId && fileName) {
+        try {
+          const safeName = fileName.replace(/'/g, "\\'");
+          const folderClause = targetFolderId
+            ? `'${targetFolderId}' in parents and `
+            : "";
+          const searchRes = await drive.files.list({
+            q: `${folderClause}name = '${safeName}' and trashed = false`,
+            fields: "files(id, name, mimeType, size, createdTime, appProperties)",
+            orderBy: "createdTime desc",
+            pageSize: 5,
+          });
+
+          const candidates = searchRes.data.files ?? [];
+          const matched =
+            candidates.find((f) => f.appProperties?.orderId === orderId) ??
+            candidates[0];
+
+          if (matched?.id) {
+            resolvedFileId = matched.id;
+          }
+        } catch (searchErr) {
+          console.warn(
+            "[DriveStorage] Warning searching Drive folder for file:",
+            searchErr
+          );
+        }
+      }
+
+      // 3. Fallback: Search across Drive by name and orderId appProperty (catches files in subfolders)
+      if (!resolvedFileId && fileName) {
+        try {
+          const safeName = fileName.replace(/'/g, "\\'");
+          const searchRes = await drive.files.list({
+            q: `name = '${safeName}' and appProperties has { key='orderId' and value='${orderId}' } and trashed = false`,
+            fields: "files(id, name, mimeType, size, createdTime, appProperties)",
+            orderBy: "createdTime desc",
+            pageSize: 5,
+          });
+
+          const found = searchRes.data.files?.[0];
+          if (found?.id) {
+            resolvedFileId = found.id;
+          }
+        } catch (propErr) {
+          console.warn(
+            "[DriveStorage] Warning searching Drive by appProperties:",
+            propErr
+          );
+        }
+      }
     }
+
+    if (!resolvedFileId) {
+      throw new ValidationError(
+        "Could not verify the uploaded file in Google Drive. Please retry uploading your photo."
+      );
+    }
+
     const drive = this.getDriveClient();
     const res = await drive.files.get({
-      fileId: storageFileId,
+      fileId: resolvedFileId,
       fields: "id,name,mimeType,size",
     });
 
+    if (sessionId) {
+      driveSessions.delete(sessionId);
+    }
+
     return {
       storageProvider: "drive",
-      storageFileId: res.data.id ?? storageFileId,
-      originalName: res.data.name ?? "photo.jpg",
-      mime: res.data.mimeType ?? "image/jpeg",
-      sizeBytes: Number(res.data.size ?? 0),
+      storageFileId: res.data.id ?? resolvedFileId,
+      originalName: res.data.name ?? fileName ?? "photo.jpg",
+      mime: res.data.mimeType ?? mimeType ?? "image/jpeg",
+      sizeBytes: Number(res.data.size ?? fileSize ?? 0),
     };
   }
 

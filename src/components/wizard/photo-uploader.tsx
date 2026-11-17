@@ -250,10 +250,17 @@ export function PhotoUploader({
           }
 
           if (storageProvider === "drive" && (chunkRes.status === 200 || chunkRes.status === 201)) {
-            const driveData = (await chunkRes.json().catch(() => ({}))) as {
-              id?: string;
-            };
-            driveFileId = driveData.id;
+            try {
+              const text = await chunkRes.text();
+              if (text) {
+                const driveData = JSON.parse(text) as { id?: string };
+                if (driveData.id) {
+                  driveFileId = driveData.id;
+                }
+              }
+            } catch {
+              // Body parsing failed or already read; server-side resolution will handle it
+            }
           }
 
           startByte = endByte;
@@ -268,6 +275,30 @@ export function PhotoUploader({
           );
         }
 
+        // If upload to Drive finished all bytes but driveFileId wasn't extracted from the response body,
+        // query the upload status directly to retrieve the created file ID.
+        if (storageProvider === "drive" && !driveFileId && startByte >= totalSize) {
+          try {
+            const statusRes = await fetch(uploadUrl, {
+              method: "PUT",
+              headers: {
+                "Content-Range": `bytes */${totalSize}`,
+              },
+            });
+            if (statusRes.status === 200 || statusRes.status === 201) {
+              const statusText = await statusRes.text();
+              if (statusText) {
+                const statusData = JSON.parse(statusText) as { id?: string };
+                if (statusData.id) {
+                  driveFileId = statusData.id;
+                }
+              }
+            }
+          } catch {
+            // Server-side resolution in finalizeUpload will handle it
+          }
+        }
+
         // 3. Finalize upload on server
         const finalRes = await fetch("/api/uploads/finalize", {
           method: "POST",
@@ -280,6 +311,10 @@ export function PhotoUploader({
             category,
             contentHash: item.contentHash,
             perceptualHash: item.perceptualHash,
+            fileName: item.fileName,
+            fileSize: item.file.size,
+            mimeType: item.file.type,
+            uploadUrl,
           }),
         });
 

@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
       category?: "solo" | "shared";
       contentHash?: string;
       perceptualHash?: string;
+      fileName?: string;
+      fileSize?: number;
+      mimeType?: string;
+      uploadUrl?: string;
     };
 
     if (!body.draftToken || !body.sessionId) {
@@ -39,7 +43,15 @@ export async function POST(req: NextRequest) {
     const finalized = await storage.finalizeUpload(
       order.id,
       body.sessionId,
-      body.storageFileId
+      body.storageFileId,
+      {
+        fileName: body.fileName,
+        fileSize: body.fileSize,
+        mimeType: body.mimeType,
+        uploadUrl: body.uploadUrl,
+        driveFolderId: order.driveFolderId,
+        category: body.category,
+      }
     );
 
     // If stored locally, verify magic bytes on disk to prevent spoofed file extensions

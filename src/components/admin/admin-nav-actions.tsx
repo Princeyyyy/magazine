@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -205,20 +206,65 @@ export function AdminOrdersFilterBar({
   initialSort = "newest",
   statusOptions,
 }: AdminOrdersFilterBarProps) {
+  const router = useRouter();
+  const [query, setQuery] = useState(initialQuery);
+  const [status, setStatus] = useState(initialStatus);
+  const [theme, setTheme] = useState(initialTheme);
+  const [sort, setSort] = useState(initialSort);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  useEffect(() => {
+    setQuery(initialQuery);
+    setStatus(initialStatus);
+    setTheme(initialTheme);
+    setSort(initialSort);
+  }, [initialQuery, initialStatus, initialTheme, initialSort]);
+
+  const hasSelection = Boolean(
+    query.trim().length > 0 ||
+    status !== "" ||
+    theme !== "" ||
+    (sort !== "" && sort !== "newest")
+  );
+
+  const hasActiveUrlFilters = Boolean(
+    initialQuery.trim().length > 0 ||
+    initialStatus !== "" ||
+    initialTheme !== "" ||
+    (initialSort !== "" && initialSort !== "newest")
+  );
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (!hasSelection || isSubmitting || isResetting) {
+      e.preventDefault();
+      return;
+    }
+    setIsSubmitting(true);
+  };
+
+  const handleReset = () => {
+    setIsResetting(true);
+    setQuery("");
+    setStatus("");
+    setTheme("");
+    setSort("newest");
+    router.push("/admin");
+  };
 
   return (
     <form
       method="GET"
       action="/admin"
-      onSubmit={() => setIsSubmitting(true)}
+      onSubmit={handleSubmit}
       className="rounded-2xl border border-[#EFE6E0] bg-white p-4 sm:p-5 shadow-2xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center"
     >
       <div className="relative sm:col-span-2 lg:col-span-4 min-w-0">
         <Search className="h-4 w-4 text-[#A39197] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         <Input
           name="q"
-          defaultValue={initialQuery}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name, email, or reference..."
           className="pl-10 h-10 w-full"
         />
@@ -226,7 +272,8 @@ export function AdminOrdersFilterBar({
 
       <EditorialSelect
         name="status"
-        defaultValue={initialStatus}
+        value={status}
+        onChange={(val) => setStatus(val)}
         ariaLabel="Filter by status"
         className="w-full min-w-0 lg:col-span-2"
         size="md"
@@ -236,9 +283,10 @@ export function AdminOrdersFilterBar({
 
       <EditorialSelect
         name="theme"
-        defaultValue={initialTheme}
+        value={theme}
+        onChange={(val) => setTheme(val)}
         ariaLabel="Filter by colour theme"
-        className="w-full min-w-0 lg:col-span-3"
+        className="w-full min-w-0 lg:col-span-2"
         size="md"
         triggerClassName="text-xs"
         options={[
@@ -253,7 +301,8 @@ export function AdminOrdersFilterBar({
 
       <EditorialSelect
         name="sort"
-        defaultValue={initialSort}
+        value={sort}
+        onChange={(val) => setSort(val)}
         ariaLabel="Sort by last updated"
         className="w-full min-w-0 lg:col-span-2"
         size="md"
@@ -264,21 +313,47 @@ export function AdminOrdersFilterBar({
         ]}
       />
 
-      <Button
-        type="submit"
-        size="sm"
-        disabled={isSubmitting}
-        className="h-10 w-full lg:col-span-1 min-w-[80px]"
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Filtering...</span>
-          </>
-        ) : (
-          <span>Filter</span>
+      <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-2 w-full">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!hasSelection || isSubmitting || isResetting}
+          title={
+            hasSelection
+              ? "Apply selected filters"
+              : "Select at least one filter or search keyword to filter"
+          }
+          className="h-10 flex-1 min-w-[75px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Filtering...</span>
+            </>
+          ) : (
+            <span>Filter</span>
+          )}
+        </Button>
+
+        {(hasActiveUrlFilters || hasSelection) && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isResetting || isSubmitting}
+            onClick={handleReset}
+            title="Reset all filters"
+            className="h-10 px-3 text-[#8C7A80] hover:text-[#1F1619] cursor-pointer"
+          >
+            {isResetting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" />
+            )}
+            <span className="sr-only sm:not-sr-only sm:inline-block">Reset</span>
+          </Button>
         )}
-      </Button>
+      </div>
     </form>
   );
 }
@@ -299,13 +374,11 @@ function buildPaginationUrl(
   targetPage: number
 ): string {
   const sp = new URLSearchParams();
-  if (baseParams.q) sp.set("q", baseParams.q);
+  if (baseParams.q?.trim()) sp.set("q", baseParams.q.trim());
   if (baseParams.status) sp.set("status", baseParams.status);
   if (baseParams.theme) sp.set("theme", baseParams.theme);
-  if (baseParams.sort && baseParams.sort !== "oldest") {
-    // default is newest
-  } else if (baseParams.sort) {
-    sp.set("sort", baseParams.sort);
+  if (baseParams.sort && baseParams.sort === "oldest") {
+    sp.set("sort", "oldest");
   }
   if (targetPage > 1) {
     sp.set("page", String(targetPage));
@@ -314,90 +387,157 @@ function buildPaginationUrl(
   return qs ? `/admin?${qs}` : "/admin";
 }
 
+function getPaginationRange(
+  currentPage: number,
+  totalPages: number
+): (number | "...")[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "...",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    totalPages,
+  ];
+}
+
 /**
  * Pagination Navigation bar with instant feedback on link clicks.
  * Strictly uses plain serializable props (numbers, plain baseParams object).
+ * Uses Next.js Link for instant prefetching and SPA navigation back and forth.
  */
 export function AdminPaginationNav({
   currentPage,
   totalPages,
   baseParams,
 }: AdminPaginationNavProps) {
-  const router = useRouter();
-  const [navigatingPage, setNavigatingPage] = useState<number | null>(null);
+  const [pendingPage, setPendingPage] = useState<number | null>(null);
 
-  const handleNavigate = (page: number) => {
-    setNavigatingPage(page);
-    router.push(buildPaginationUrl(baseParams, page));
-  };
+  // Clear pending spinner whenever currentPage updates after navigation
+  useEffect(() => {
+    setPendingPage(null);
+  }, [currentPage]);
+
+  if (totalPages <= 1) {
+    return (
+      <nav aria-label="Orders pagination" className="flex items-center gap-1.5">
+        <span
+          aria-current="page"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#9E4765] text-xs font-semibold text-white shadow-2xs select-none"
+        >
+          1
+        </span>
+      </nav>
+    );
+  }
 
   return (
     <nav aria-label="Orders pagination" className="flex items-center gap-1.5">
       {currentPage > 1 ? (
-        <button
-          type="button"
-          disabled={navigatingPage !== null}
-          onClick={() => handleNavigate(currentPage - 1)}
-          className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors cursor-pointer disabled:opacity-60"
+        <Link
+          href={buildPaginationUrl(baseParams, currentPage - 1)}
+          scroll={false}
+          onClick={() => setPendingPage(currentPage - 1)}
+          className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors cursor-pointer"
         >
-          {navigatingPage === currentPage - 1 ? (
+          {pendingPage === currentPage - 1 ? (
             <Loader2 className="h-3 w-3 animate-spin text-[#9E4765]" />
           ) : (
             <span className="text-xs">&larr;</span>
           )}
           <span>Previous</span>
-        </button>
+        </Link>
       ) : (
-        <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
+        <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed select-none">
           <span className="text-xs">&larr;</span>
           <span>Previous</span>
         </span>
       )}
 
       <div className="flex items-center gap-1 px-1">
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pNum) => {
+        {getPaginationRange(currentPage, totalPages).map((item, idx) => {
+          if (item === "...") {
+            return (
+              <span
+                key={`ellipsis-${idx}`}
+                className="inline-flex h-8 w-6 items-center justify-center text-xs text-[#A39197] select-none"
+              >
+                &hellip;
+              </span>
+            );
+          }
+
+          const pNum = item as number;
           const isActive = pNum === currentPage;
-          const isLoading = navigatingPage === pNum;
+          const isLoading = pendingPage === pNum && !isActive;
+
+          if (isActive) {
+            return (
+              <span
+                key={pNum}
+                aria-current="page"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#9E4765] text-xs font-semibold text-white shadow-2xs select-none"
+              >
+                {pNum}
+              </span>
+            );
+          }
 
           return (
-            <button
+            <Link
               key={pNum}
-              type="button"
-              disabled={isActive || navigatingPage !== null}
-              onClick={() => handleNavigate(pNum)}
-              aria-current={isActive ? "page" : undefined}
-              className={
-                isActive
-                  ? "inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#9E4765] text-xs font-semibold text-white shadow-2xs"
-                  : "inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#EAE0DA] bg-white text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors cursor-pointer disabled:opacity-60"
-              }
+              href={buildPaginationUrl(baseParams, pNum)}
+              scroll={false}
+              onClick={() => setPendingPage(pNum)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#EAE0DA] bg-white text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors cursor-pointer"
             >
               {isLoading ? (
                 <Loader2 className="h-3 w-3 animate-spin text-[#9E4765]" />
               ) : (
                 pNum
               )}
-            </button>
+            </Link>
           );
         })}
       </div>
 
       {currentPage < totalPages ? (
-        <button
-          type="button"
-          disabled={navigatingPage !== null}
-          onClick={() => handleNavigate(currentPage + 1)}
-          className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors cursor-pointer disabled:opacity-60"
+        <Link
+          href={buildPaginationUrl(baseParams, currentPage + 1)}
+          scroll={false}
+          onClick={() => setPendingPage(currentPage + 1)}
+          className="inline-flex h-8 items-center gap-1 rounded-full border border-[#EAE0DA] bg-white px-3 text-xs font-medium text-[#4A3A40] hover:border-[#9E4765] hover:text-[#9E4765] transition-colors cursor-pointer"
         >
           <span>Next</span>
-          {navigatingPage === currentPage + 1 ? (
+          {pendingPage === currentPage + 1 ? (
             <Loader2 className="h-3 w-3 animate-spin text-[#9E4765]" />
           ) : (
             <span className="text-xs">&rarr;</span>
           )}
-        </button>
+        </Link>
       ) : (
-        <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed">
+        <span className="inline-flex h-8 items-center gap-1 rounded-full border border-[#F2EAE4] bg-[#FAF6F3] px-3 text-xs text-[#C2B2B8] cursor-not-allowed select-none">
           <span>Next</span>
           <span className="text-xs">&rarr;</span>
         </span>
