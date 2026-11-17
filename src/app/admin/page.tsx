@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import {
   AdminOpenBriefButton,
+  AdminDeleteOrderButton,
   AdminOrderRefLink,
   AdminConfigureServicesButton,
   AdminOrdersFilterBar,
@@ -177,7 +178,7 @@ export default async function AdminOrdersPage({
                 <th className="py-3.5 px-5 font-medium">Photos</th>
                 <th className="py-3.5 px-5 font-medium">Status</th>
                 <th className="py-3.5 px-5 font-medium">Last Updated</th>
-                <th className="py-3.5 px-5 text-right font-medium">Brief</th>
+                <th className="py-3.5 px-5 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F3ECE7] text-sm">
@@ -306,7 +307,15 @@ export default async function AdminOrdersPage({
                         </div>
                       </td>
                       <td className="py-4 px-5 text-right">
-                        <AdminOpenBriefButton orderId={order.id} />
+                        <div className="flex items-center justify-end gap-2">
+                          <AdminOpenBriefButton orderId={order.id} />
+                          <AdminDeleteOrderButton
+                            orderId={order.id}
+                            reference={order.reference}
+                            starName={order.herName}
+                            customerName={order.customerName}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );

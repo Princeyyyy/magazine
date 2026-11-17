@@ -395,6 +395,14 @@ export async function submitOrder(
   });
 
   if (!existingOrder) {
+    // Self-healing: if the previous draft was deleted but the customer is submitting
+    // with filled-out form values, recreate the draft order seamlessly so their flow is never broken.
+    if (submittedValues && hasMeaningfulValues(submittedValues)) {
+      const saved = await saveDraftAnswers(undefined, submittedValues);
+      if (saved.draftToken) {
+        return submitOrder(saved.draftToken, submittedValues);
+      }
+    }
     throw new NotFoundError("Order draft");
   }
 

@@ -1,11 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditorialSelect } from "@/components/ui/editorial-select";
-import { ArrowUpRight, Loader2, RotateCcw, Search } from "lucide-react";
+import {
+  ArrowUpRight,
+  Loader2,
+  RotateCcw,
+  Search,
+  Trash2,
+  AlertTriangle,
+  X,
+} from "lucide-react";
 
 /**
  * Open Brief button in the admin orders table.
@@ -395,5 +403,235 @@ export function AdminPaginationNav({
         </span>
       )}
     </nav>
+  );
+}
+
+interface AdminDeleteOrderButtonProps {
+  orderId: string;
+  reference: string;
+  starName?: string | null;
+  customerName?: string | null;
+  onDeleted?: () => void;
+  variant?: "table" | "detail";
+}
+
+/**
+ * Delete button with an editorial confirmation modal for magazine order entries.
+ * Prompts the admin to confirm before permanently wiping database records,
+ * Google Drive folders, and local photo files.
+ */
+export function AdminDeleteOrderButton({
+  orderId,
+  reference,
+  starName,
+  customerName,
+  onDeleted,
+  variant = "table",
+}: AdminDeleteOrderButtonProps) {
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !deleting) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, deleting]);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "DELETE",
+      });
+
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: { message?: string };
+      };
+
+      if (!res.ok) {
+        throw new Error(data.error?.message || "Failed to delete order entry.");
+      }
+
+      setIsOpen(false);
+      if (onDeleted) {
+        onDeleted();
+      } else {
+        router.refresh();
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete order entry."
+      );
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <>
+      {variant === "detail" ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setError(null);
+            setIsOpen(true);
+          }}
+          className="cursor-pointer text-[#8C7A80] hover:text-[#B3261E] hover:border-[#F3D1D7] hover:bg-[#FDF6F7] transition-colors"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-[#B3261E]" />
+          <span>Delete Issue</span>
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setError(null);
+            setIsOpen(true);
+          }}
+          title={`Delete issue ${reference}`}
+          className="cursor-pointer text-[#8C7A80] hover:text-[#B3261E] hover:border-[#F3D1D7] hover:bg-[#FDF6F7] transition-colors px-2.5 sm:px-3"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-[#B3261E]" />
+          <span className="sr-only sm:not-sr-only sm:inline-block">Delete</span>
+        </Button>
+      )}
+
+      {isOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`delete-modal-title-${orderId}`}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deleting) {
+              setIsOpen(false);
+            }
+          }}
+        >
+          <div className="relative w-full max-w-lg rounded-3xl border border-[#EFE6E0] bg-white p-6 sm:p-8 shadow-2xl space-y-6 text-left animate-in zoom-in-95 duration-200">
+            {/* Close button */}
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => setIsOpen(false)}
+              className="absolute top-5 right-5 rounded-full p-1.5 text-[#8C7A80] hover:bg-[#F6EBF0] hover:text-[#1F1619] transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+
+            {/* Header with warning icon */}
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#FCDADF] bg-[#FDF2F4] text-[#B3261E]">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div className="space-y-1 pr-6">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B3261E]">
+                  Irreversible Action
+                </p>
+                <h2
+                  id={`delete-modal-title-${orderId}`}
+                  className="font-serif text-2xl font-bold text-[#1F1619]"
+                >
+                  Delete Magazine Issue?
+                </h2>
+              </div>
+            </div>
+
+            {/* Target Details Card */}
+            <div className="rounded-2xl border border-[#EFE6E0] bg-[#FCF9F7] p-4 text-xs space-y-2">
+              <div className="flex justify-between items-center text-[#4A3A40]">
+                <span className="text-[#8C7A80]">Order Reference:</span>
+                <span className="font-mono font-bold text-[#1F1619]">
+                  {reference}
+                </span>
+              </div>
+              {starName && (
+                <div className="flex justify-between items-center text-[#4A3A40]">
+                  <span className="text-[#8C7A80]">Featured Star:</span>
+                  <span className="font-medium text-[#1F1619]">{starName}</span>
+                </div>
+              )}
+              {customerName && (
+                <div className="flex justify-between items-center text-[#4A3A40]">
+                  <span className="text-[#8C7A80]">Ordered By:</span>
+                  <span className="text-[#1F1619]">{customerName}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Detailed Explanation */}
+            <div className="text-xs text-[#6E5A61] space-y-2 leading-relaxed">
+              <p>
+                Permanently deletes this entry and all related content from the system:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-[#4A3A40] pl-1">
+                <li>All questionnaire answers and editorial responses</li>
+                <li>All customer photos registered in the database</li>
+                <li>The dedicated Google Drive folder and its stored files</li>
+                <li>Audit trail logs and status history entries</li>
+              </ul>
+              <p className="font-medium text-[#B3261E] pt-1">
+                This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Error Message if deletion failed */}
+            {error && (
+              <div className="rounded-xl border border-[#FCDADF] bg-[#FDF2F4] p-3 text-xs text-[#B3261E]">
+                {error}
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={deleting}
+                onClick={() => setIsOpen(false)}
+                className="cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={deleting}
+                onClick={handleDelete}
+                className="cursor-pointer bg-[#B3261E] hover:bg-[#991B1B] text-white border-0 min-w-[130px]"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete Issue</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

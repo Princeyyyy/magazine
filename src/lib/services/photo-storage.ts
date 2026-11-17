@@ -54,6 +54,7 @@ export interface PhotoStorageAdapter {
   getThumbnail(fileId: string, orderId?: string): Promise<{ buffer: Buffer; mimeType: string }>;
   getFile(fileId: string, orderId?: string): Promise<{ buffer: Buffer; mimeType: string; fileName: string }>;
   deleteFile(fileId: string, orderId?: string): Promise<void>;
+  deleteOrderFolder(orderId: string, driveFolderId?: string | null): Promise<void>;
   testConnection(): Promise<{ ok: boolean; message: string }>;
 }
 
@@ -331,6 +332,11 @@ export class LocalDiskStorage implements PhotoStorageAdapter {
     await fs.unlink(path.join(orderDir, safeFileId)).catch(() => {});
     await fs.unlink(path.join(orderDir, "Solo Photos", safeFileId)).catch(() => {});
     await fs.unlink(path.join(orderDir, "Shared Photos", safeFileId)).catch(() => {});
+  }
+
+  async deleteOrderFolder(orderId: string): Promise<void> {
+    const dir = this.getOrderDir(orderId);
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 
   async testConnection(): Promise<{ ok: boolean; message: string }> {
@@ -613,6 +619,14 @@ export class DriveStorage implements PhotoStorageAdapter {
   async deleteFile(fileId: string): Promise<void> {
     const drive = this.getDriveClient();
     await drive.files.delete({ fileId }).catch(() => {});
+  }
+
+  async deleteOrderFolder(_orderId: string, driveFolderId?: string | null): Promise<void> {
+    if (!driveFolderId || driveFolderId.startsWith("local-folder:")) return;
+    const drive = this.getDriveClient();
+    await drive.files.delete({ fileId: driveFolderId }).catch((err) => {
+      console.warn(`[DriveStorage] Warning deleting Drive folder ${driveFolderId}:`, err);
+    });
   }
 
   async testConnection(): Promise<{ ok: boolean; message: string }> {

@@ -97,4 +97,34 @@ describe("Lazy Order Creation & Phantom Record Prevention", () => {
     expect(restored).not.toBeNull();
     expect(restored?.values["her_name"]).toBe("Amina Hassan");
   });
+
+  it("gracefully re-initializes a new draft when customer continues after previous draft was deleted", async () => {
+    await ensureDbReady();
+    // 1. Create a draft
+    const firstSave = await saveDraftAnswers(undefined, {
+      customer_name: "Original Customer",
+      her_name: "Original Star",
+    });
+    expect(firstSave.draftToken).toBeTruthy();
+
+    // 2. Simulate admin deleting the draft from DB
+    await db.delete(orders).where(eq(orders.draftToken, firstSave.draftToken));
+
+    // 3. User tries to get draft by deleted token -> returns null
+    const afterDelete = await getDraftByToken(firstSave.draftToken);
+    expect(afterDelete).toBeNull();
+
+    // 4. User continues typing and saves using the old token -> gracefully recovers and creates a new draft!
+    const recoverySave = await saveDraftAnswers(firstSave.draftToken, {
+      customer_name: "Original Customer Continued",
+      her_name: "Original Star Continued",
+    });
+
+    expect(recoverySave.created).toBe(true);
+    expect(recoverySave.draftToken).toBeTruthy();
+    expect(recoverySave.draftToken).not.toBe(firstSave.draftToken);
+
+    // Clean up
+    await db.delete(orders).where(eq(orders.draftToken, recoverySave.draftToken));
+  });
 });

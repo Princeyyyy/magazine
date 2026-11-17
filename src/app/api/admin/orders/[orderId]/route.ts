@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, ensureDbReady } from "@/db";
-import { orders, statusHistory, orderStatusEnum, type OrderStatus } from "@/db/schema";
+import { orders, answers, photos, statusHistory, devOutbox, orderStatusEnum, type OrderStatus } from "@/db/schema";
 import { getAuthenticatedAdminEmail } from "@/auth";
 import { getMailer } from "@/lib/services/mailer";
+import { getPhotoStorage, getLocalDiskStorage } from "@/lib/services/photo-storage";
 import { handleApiError } from "@/lib/api-response";
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 
@@ -108,6 +109,71 @@ export async function PATCH(
     }
 
     throw new ForbiddenError("Unsupported admin action.");
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  context: { params: Promise<{ orderId: string }> }
+) {
+  try {
+    const adminEmail = await getAuthenticatedAdminEmail();
+    if (!adminEmail) {
+      throw new UnauthorizedError();
+    }
+
+    const { orderId } = await context.params;
+    await ensureDbReady();
+
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+    });
+
+    if (!order) {
+      throw new NotFoundError("Order", orderId);
+    }
+
+    // 1. Delete associated Google Drive folder and its contents
+    if (order.driveFolderId) {
+      try {
+        const storage = getPhotoStorage();
+        await storage.deleteOrderFolder(order.id, order.driveFolderId);
+      } catch (storageErr) {
+        console.warn(
+          `[admin:delete] Warning deleting Google Drive folder for ${order.reference}:`,
+          storageErr
+        );
+      }
+    }
+
+    // 2. Delete any local storage files or upload directory for this order
+    try {
+      const local = getLocalDiskStorage();
+      await local.deleteOrderFolder(order.id);
+    } catch (localErr) {
+      console.warn(
+        `[admin:delete] Warning cleaning local storage for ${order.id}:`,
+        localErr
+      );
+    }
+
+    // 3. Atomically delete all associated records from the database
+    await db.transaction(async (tx) => {
+      await tx.delete(devOutbox).where(eq(devOutbox.orderId, order.id));
+      await tx.delete(statusHistory).where(eq(statusHistory.orderId, order.id));
+      await tx.delete(photos).where(eq(photos.orderId, order.id));
+      await tx.delete(answers).where(eq(answers.orderId, order.id));
+      await tx.delete(orders).where(eq(orders.id, order.id));
+    });
+
+    return NextResponse.json({
+      ok: true,
+      deletedId: order.id,
+      deletedReference: order.reference,
+      deletedStar: order.herName || "Featured Star",
+    });
   } catch (error) {
     return handleApiError(error);
   }

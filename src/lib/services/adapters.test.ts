@@ -34,6 +34,12 @@ describe("LocalDiskStorage & Security Preview Tokens", () => {
     expect(readBack.buffer.toString("utf8")).toBe("fake-jpeg-binary-content");
 
     await storage.deleteFile(finalized.storageFileId, orderId);
+
+    // Test deleting entire order folder
+    await storage.deleteOrderFolder(orderId);
+    const listed = await storage.listPhotos(orderId);
+    expect(listed).toHaveLength(0);
+
     await fs.rm(tempBase, { recursive: true, force: true });
   });
 

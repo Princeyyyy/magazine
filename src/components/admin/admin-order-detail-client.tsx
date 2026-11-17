@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { EditorialSelect } from "@/components/ui/editorial-select";
 import { getSectionIcon } from "@/components/icons/SectionIcons";
 import { BoboStudioTag } from "@/components/brand/bobo-studio-tag";
+import { AdminDeleteOrderButton } from "@/components/admin/admin-nav-actions";
 import {
   generateOrderWordBlob,
   generateOrderPdfBlob,
@@ -545,6 +546,15 @@ export function AdminOrderDetailClient({
                 </a>
               </Button>
             )}
+
+            <AdminDeleteOrderButton
+              orderId={order.id}
+              reference={order.reference}
+              starName={order.herName}
+              customerName={order.customerName}
+              variant="detail"
+              onDeleted={() => router.push("/admin")}
+            />
           </div>
         </div>
 

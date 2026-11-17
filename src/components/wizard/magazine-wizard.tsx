@@ -316,18 +316,37 @@ export function MagazineWizard({
           setIsAdmin(data.isAdmin);
         }
 
-        // If token was invalid or pruned from database, reset storage and show clean welcome
+        // If token was invalid or deleted from database, clean state and let user continue seamlessly
         if (!data.draft) {
           if (typeof window !== "undefined") {
             window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+            // Clean resume parameter from address bar without reloading
+            if (window.location.search.includes("resume=")) {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("resume");
+              window.history.replaceState(
+                null,
+                "",
+                url.pathname + (url.search ? url.search : "")
+              );
+            }
           }
+          draftTokenRef.current = "";
+          setDraftToken("");
+          setOrderReference("");
+          setOrderStatus("draft");
+
           if (!welcomedRef.current) {
             welcomedRef.current = true;
             showEditorialToast(
-              "Welcome to Custom Magazine",
-              "Craft a bespoke editorial keepsake. Your answers and photos save automatically as you go.",
+              resumeTokenParam
+                ? "Starting a Fresh Issue"
+                : "Welcome to Custom Magazine",
+              resumeTokenParam
+                ? "This draft is no longer active, so we've started a fresh magazine issue for you. Your answers and photos save automatically as you go!"
+                : "Craft a bespoke editorial keepsake. Your answers and photos save automatically as you go.",
               "default",
-              5000
+              6000
             );
           }
           return;
