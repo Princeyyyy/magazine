@@ -934,10 +934,10 @@ export const FORM_PAGES: readonly PageConfig[] = [
             label: "Songs",
             type: "repeatableRows",
             required: true,
-            initialRows: 5,
-            minRows: 5,
+            initialRows: 6,
+            minRows: 6,
             maxRows: 8,
-            targetHint: "Target: 5 to 8 tracks (at least 5 required)",
+            targetHint: "Target: 6 to 8 tracks (at least 6 required)",
             subFields: [
               {
                 key: "song_title",
@@ -952,7 +952,7 @@ export const FORM_PAGES: readonly PageConfig[] = [
                 maxLength: 100,
               },
             ],
-            errorMessage: "Please add at least 5 songs (with both song title and artist) for her playlist page.",
+            errorMessage: "Please add at least 6 songs (with both song title and artist) for her playlist page.",
           },
         ],
       },

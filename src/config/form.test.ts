@@ -56,7 +56,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
     expect(defaults["top_series"]).toHaveLength(4);
     expect(defaults["top_3_perfumes"]).toHaveLength(3);
     expect(defaults["wishlist"]).toHaveLength(3);
-    expect(defaults["songs"]).toHaveLength(5);
+    expect(defaults["songs"]).toHaveLength(6);
     expect(defaults["key_moments"]).toHaveLength(5);
     expect(defaults["messages_from_loved_ones"]).toHaveLength(1);
     expect(defaults["subject_gender"]).toBe("Female");
@@ -331,7 +331,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
       expect(result.success).toBe(false);
     });
 
-    it("passes when at least 5 complete songs are provided", () => {
+    it("passes when at least 6 complete songs are provided", () => {
       const result = page6Schema.safeParse({
         songs: [
           { song_title: "CUFF IT", artist: "Beyoncé" },
@@ -339,6 +339,7 @@ describe("Form Configuration & Generated Zod Schemas", () => {
           { song_title: "Water", artist: "Tyla" },
           { song_title: "Essence", artist: "Wizkid" },
           { song_title: "Calm Down", artist: "Rema" },
+          { song_title: "Overdue", artist: "Ghana Boy" },
           { song_title: "", artist: "" },
         ],
       });
