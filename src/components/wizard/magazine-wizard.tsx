@@ -232,6 +232,8 @@ export function MagazineWizard({
 
   const valuesRef = useRef(values);
   valuesRef.current = values;
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
   const draftTokenRef = useRef(draftToken);
   draftTokenRef.current = draftToken;
   const userEditedBeforeInitRef = useRef(false);
@@ -591,23 +593,34 @@ export function MagazineWizard({
     });
   }, []);
 
-  const handlePhotosChange = useCallback(
-    (nextPhotos: UploadedPhotoItem[]) => {
-      setPhotos((prevPhotos) => {
-        if (nextPhotos.length > prevPhotos.length) {
-          const addedCount = nextPhotos.length - prevPhotos.length;
-          showEditorialToast(
-            addedCount === 1
-              ? "Photo added to your issue"
-              : `${addedCount} photos added to your issue`,
-            `${nextPhotos.length} photos saved to your private folder.`
-          );
-        }
-        return nextPhotos;
-      });
-      const solo = nextPhotos.filter((p) => p.category !== "shared");
-      const shared = nextPhotos.filter((p) => p.category === "shared");
-      setFieldValue("photos", nextPhotos);
+  const handleCategoryPhotosChange = useCallback(
+    (category: "solo" | "shared", nextCategoryPhotos: UploadedPhotoItem[]) => {
+      const prevPhotos = photosRef.current;
+      const otherCategoryPhotos = prevPhotos.filter((p) =>
+        category === "shared"
+          ? p.category !== "shared"
+          : p.category === "shared"
+      );
+      const updatedAll = [...otherCategoryPhotos, ...nextCategoryPhotos].sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      );
+
+      photosRef.current = updatedAll;
+      setPhotos(updatedAll);
+
+      if (updatedAll.length > prevPhotos.length) {
+        const addedCount = updatedAll.length - prevPhotos.length;
+        showEditorialToast(
+          addedCount === 1
+            ? "Photo added to your issue"
+            : `${addedCount} photos added to your issue`,
+          `${updatedAll.length} photos saved to your private folder.`
+        );
+      }
+
+      const solo = updatedAll.filter((p) => p.category !== "shared");
+      const shared = updatedAll.filter((p) => p.category === "shared");
+      setFieldValue("photos", updatedAll);
       setFieldValue("solo_photos", solo);
       setFieldValue("shared_photos", shared);
     },
@@ -1247,13 +1260,7 @@ export function MagazineWizard({
             maxPhotos={field.maxPhotos}
             photos={categoryPhotos}
             onChange={(nextCategoryPhotos) => {
-              const otherCategoryPhotos = photos.filter((p) =>
-                category === "shared" ? p.category !== "shared" : p.category === "shared"
-              );
-              const updatedAll = [...otherCategoryPhotos, ...nextCategoryPhotos].sort(
-                (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-              );
-              handlePhotosChange(updatedAll);
+              handleCategoryPhotosChange(category, nextCategoryPhotos);
             }}
             errorMessage={fieldError}
             gender={selectedGender}

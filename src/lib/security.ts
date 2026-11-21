@@ -52,6 +52,60 @@ export function verifyPhotoPreviewToken(
 }
 
 /**
+ * Generates a short-lived HMAC-SHA256 signature binding a Google Drive resumable
+ * upload URL to an orderId so the server-side chunk proxy cannot be abused as an SSRF relay.
+ */
+export function signDriveUploadUrl(
+  uploadUrl: string,
+  orderId: string,
+  expiresInSeconds = 3600 * 6
+): string {
+  const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  const payload = `drive-upload:${orderId}:${uploadUrl}:${expiresAt}`;
+  const hmac = crypto
+    .createHmac("sha256", env.AUTH_SECRET)
+    .update(payload)
+    .digest("hex");
+  return `${expiresAt}.${hmac}`;
+}
+
+export function verifyDriveUploadUrl(
+  uploadUrl: string,
+  orderId: string,
+  token: string
+): boolean {
+  if (
+    !uploadUrl.startsWith("https://www.googleapis.com/upload/drive/v3/files?")
+  ) {
+    return false;
+  }
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [expiresAtStr, signature] = parts;
+  if (!expiresAtStr || !signature) return false;
+
+  const expiresAt = Number(expiresAtStr);
+  if (Number.isNaN(expiresAt) || Math.floor(Date.now() / 1000) > expiresAt) {
+    return false;
+  }
+
+  const payload = `drive-upload:${orderId}:${uploadUrl}:${expiresAt}`;
+  const expected = crypto
+    .createHmac("sha256", env.AUTH_SECRET)
+    .update(payload)
+    .digest("hex");
+
+  try {
+    const sigBuf = Buffer.from(signature, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    if (sigBuf.length !== expBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expBuf);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validates file extension and magic bytes for .jpg, .jpeg, .png, .heic, .heif
  */
 export function validatePhotoMagicBytes(
@@ -91,7 +145,15 @@ export function validatePhotoMagicBytes(
     return { valid: true, detectedMime: "image/png" };
   }
 
-  // 3. HEIC / HEIF: ISO Base Media File Format (ftyp box at offset 4..8)
+  // 3. WEBP: RIFF....WEBP
+  if (
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return { valid: true, detectedMime: "image/webp" };
+  }
+
+  // 4. HEIC / HEIF: ISO Base Media File Format (ftyp box at offset 4..8)
   const boxType = buffer.subarray(4, 8).toString("ascii");
   if (boxType === "ftyp") {
     const brand = buffer.subarray(8, 12).toString("ascii").toLowerCase();

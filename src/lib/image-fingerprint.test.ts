@@ -47,4 +47,13 @@ describe("Image Fingerprinting & Deduplication", () => {
     expect(hash).toHaveLength(64);
     expect(/^[0-9a-f]{64}$/.test(hash)).toBe(true);
   });
+
+  it("never flags empty or sentinel all-zero/all-one perceptual hashes as visual duplicates", () => {
+    const zeros = "0".repeat(32);
+    const ones = "f".repeat(32);
+    expect(isVisualDuplicate(zeros, zeros)).toBe(false);
+    expect(isVisualDuplicate(ones, ones)).toBe(false);
+    expect(isVisualDuplicate("", "")).toBe(false);
+    expect(isVisualDuplicate(zeros, "0".repeat(31) + "1")).toBe(false);
+  });
 });

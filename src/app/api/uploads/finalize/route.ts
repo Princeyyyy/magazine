@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, ensureDbReady } from "@/db";
 import { orders, photos } from "@/db/schema";
 import { getPhotoStorage, getLocalDiskStorage } from "@/lib/services/photo-storage";
-import { validatePhotoMagicBytes } from "@/lib/security";
+import { sanitizeFileName, validatePhotoMagicBytes } from "@/lib/security";
 import { buildPhotoPreviewUrl } from "@/lib/orders";
 import { handleApiError } from "@/lib/api-response";
 import { NotFoundError, ValidationError } from "@/lib/errors";
@@ -39,18 +39,21 @@ export async function POST(req: NextRequest) {
       throw new NotFoundError("Order draft");
     }
 
+    const category = body.category === "shared" ? "shared" : "solo";
+    const safeFileName = body.fileName ? sanitizeFileName(body.fileName) : undefined;
+
     const storage = getPhotoStorage();
     const finalized = await storage.finalizeUpload(
       order.id,
       body.sessionId,
       body.storageFileId,
       {
-        fileName: body.fileName,
+        fileName: safeFileName,
         fileSize: body.fileSize,
         mimeType: body.mimeType,
         uploadUrl: body.uploadUrl,
         driveFolderId: order.driveFolderId,
-        category: body.category,
+        category,
       }
     );
 
@@ -74,27 +77,42 @@ export async function POST(req: NextRequest) {
       finalContentHash = crypto.createHash("sha256").update(fileData.buffer).digest("hex");
     }
 
-    // Check for duplicate photos against already uploaded photos for this order
+    // Normalize perceptualHash so invalid/sentinel all-zero hashes are never persisted
+    const cleanPerceptualHash =
+      body.perceptualHash &&
+      body.perceptualHash.length === 32 &&
+      body.perceptualHash !== "0".repeat(32) &&
+      body.perceptualHash.toLowerCase() !== "f".repeat(32)
+        ? body.perceptualHash
+        : null;
+
+    // Check for duplicate photos against already uploaded photos in the same category
     const existingPhotos = await db.query.photos.findMany({
       where: eq(photos.orderId, order.id),
     });
 
-    for (let i = 0; i < existingPhotos.length; i++) {
-      const existing = existingPhotos[i]!;
+    const sameCategoryPhotos = existingPhotos.filter((p) =>
+      category === "shared" ? p.category === "shared" : p.category !== "shared"
+    );
+
+    for (let i = 0; i < sameCategoryPhotos.length; i++) {
+      const existing = sameCategoryPhotos[i]!;
       const isExactDuplicate =
         finalContentHash &&
         existing.contentHash &&
         finalContentHash === existing.contentHash;
 
       const isVisDuplicate =
-        body.perceptualHash &&
+        cleanPerceptualHash &&
         existing.perceptualHash &&
-        isVisualDuplicate(body.perceptualHash, existing.perceptualHash, 8);
+        isVisualDuplicate(cleanPerceptualHash, existing.perceptualHash, 8);
 
       if (isExactDuplicate || isVisDuplicate) {
         if (finalized.storageProvider === "local") {
           const local = getLocalDiskStorage();
           await local.deleteFile(finalized.storageFileId, order.id).catch(() => {});
+        } else {
+          await storage.deleteFile(finalized.storageFileId, order.id).catch(() => {});
         }
         return NextResponse.json(
           {
@@ -111,8 +129,6 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-
-    const category = body.category === "shared" ? "shared" : "solo";
 
     // Determine sort order & whether this is the first solo photo (default to cover)
     const existingCount = existingPhotos.length;
@@ -133,7 +149,7 @@ export async function POST(req: NextRequest) {
         sortOrder: existingCount,
         category,
         contentHash: finalContentHash ?? null,
-        perceptualHash: body.perceptualHash ?? null,
+        perceptualHash: cleanPerceptualHash,
       })
       .returning();
 

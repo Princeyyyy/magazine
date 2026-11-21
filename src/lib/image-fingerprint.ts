@@ -56,9 +56,18 @@ export function computeHammingDistance(hashA: string, hashB: string): number {
   }
 }
 
+const INVALID_SENTINEL_HASHES = new Set([
+  "0".repeat(32),
+  "f".repeat(32),
+  "F".repeat(32),
+]);
+
 /**
  * Returns true if two photos are visual duplicates.
  * Default threshold is 8 bits out of 128 (>= 93.75% bit match).
+ * Ignores empty or sentinel (all-zero / all-one) hashes so non-decodable
+ * formats like HEIC in browsers without native HEIC support never falsely
+ * collide as duplicates.
  */
 export function isVisualDuplicate(
   hashA: string,
@@ -66,6 +75,10 @@ export function isVisualDuplicate(
   maxDistance = 8
 ): boolean {
   if (!hashA || !hashB) return false;
+  if (hashA.length !== 32 || hashB.length !== 32) return false;
+  if (INVALID_SENTINEL_HASHES.has(hashA) || INVALID_SENTINEL_HASHES.has(hashB)) {
+    return false;
+  }
   return computeHammingDistance(hashA, hashB) <= maxDistance;
 }
 
@@ -146,7 +159,7 @@ export async function computePerceptualHash(file: File | Blob): Promise<string> 
         canvas.height = 9;
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) {
-          resolve("0".repeat(32));
+          resolve("");
           return;
         }
 
@@ -164,15 +177,15 @@ export async function computePerceptualHash(file: File | Blob): Promise<string> 
         }
 
         const hash = computeDHashFromGrayscale(grayscale);
-        resolve(hash);
+        resolve(INVALID_SENTINEL_HASHES.has(hash) ? "" : hash);
       } catch {
-        resolve("0".repeat(32));
+        resolve("");
       }
     };
 
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      resolve("0".repeat(32));
+      resolve("");
     };
 
     img.src = objectUrl;

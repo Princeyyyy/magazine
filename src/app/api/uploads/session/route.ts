@@ -4,9 +4,13 @@ import { eq, sql } from "drizzle-orm";
 import { db, ensureDbReady } from "@/db";
 import { orders, photos } from "@/db/schema";
 import { getPhotoStorage } from "@/lib/services/photo-storage";
-import { PHOTO_UPLOAD_CONFIG } from "@/config/form";
+import { PHOTO_UPLOAD_CONFIG, resolvePhotoMimeType } from "@/config/form";
 import { handleApiError, getClientIp } from "@/lib/api-response";
-import { checkRateLimit, sanitizeFileName } from "@/lib/security";
+import {
+  checkRateLimit,
+  sanitizeFileName,
+  signDriveUploadUrl,
+} from "@/lib/security";
 import { generateNextOrderReference } from "@/lib/orders";
 import { NotFoundError, RateLimitError, ValidationError } from "@/lib/errors";
 
@@ -61,7 +65,7 @@ async function getOrCreateOrderDriveFolder(orderId: string): Promise<string> {
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
-    const rate = checkRateLimit(`upload:session:${ip}`, 60, 60_000);
+    const rate = checkRateLimit(`upload:session:${ip}`, 120, 60_000);
     if (!rate.allowed) {
       throw new RateLimitError(rate.retryAfterMs);
     }
@@ -83,9 +87,11 @@ export async function POST(req: NextRequest) {
     const allowedExts: readonly string[] = PHOTO_UPLOAD_CONFIG.acceptedExtensions;
     if (!allowedExts.includes(ext)) {
       throw new ValidationError(
-        `Unsupported file format (${ext}). Accepted: JPG, JPEG, PNG, HEIC, HEIF.`
+        `Unsupported file format (${ext}). Accepted: JPG, JPEG, PNG, WEBP, HEIC, HEIF.`
       );
     }
+
+    const resolvedMimeType = resolvePhotoMimeType(safeFileName, body.mimeType);
 
     if (body.sizeBytes <= 0 || body.sizeBytes > PHOTO_UPLOAD_CONFIG.maxFileSizeBytes) {
       throw new ValidationError(
@@ -153,7 +159,7 @@ export async function POST(req: NextRequest) {
       order.id,
       {
         fileName: safeFileName,
-        mimeType: body.mimeType || "image/jpeg",
+        mimeType: resolvedMimeType,
         sizeBytes: body.sizeBytes,
         origin,
         category,
@@ -161,9 +167,21 @@ export async function POST(req: NextRequest) {
       driveFolderId
     );
 
+    const driveProxyFields =
+      session.storageProvider === "drive"
+        ? {
+            proxyUploadUrl: "/api/uploads/drive-chunk",
+            uploadSig: signDriveUploadUrl(session.uploadUrl, order.id),
+            orderId: order.id,
+          }
+        : {};
+
     return NextResponse.json({
       session: {
         ...session,
+        ...driveProxyFields,
+        mimeType: resolvedMimeType,
+        safeFileName,
         draftToken: order.draftToken,
         reference: order.reference,
       },

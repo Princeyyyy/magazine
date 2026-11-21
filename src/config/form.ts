@@ -6,10 +6,11 @@ import { isVisualDuplicate } from "@/lib/image-fingerprint";
 // PHOTO UPLOAD CONSTANTS
 // ============================================================================
 export const PHOTO_UPLOAD_CONFIG = {
-  acceptedExtensions: [".jpg", ".jpeg", ".png", ".heic", ".heif"] as const,
+  acceptedExtensions: [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"] as const,
   acceptedMimeTypes: [
     "image/jpeg",
     "image/png",
+    "image/webp",
     "image/heic",
     "image/heif",
   ] as const,
@@ -25,6 +26,43 @@ export const PHOTO_UPLOAD_CONFIG = {
   friendlyMinMessageShared: "Please upload at least 15 shared photos with others",
   friendlyMinMessage: "A few more photos will make the magazine shine",
 } as const;
+
+/**
+ * Resolves a consistent, valid MIME type for an uploaded photo based on
+ * browser-provided MIME type and filename extension. Prevents Google Drive
+ * Content-Type / X-Upload-Content-Type mismatches (e.g. for .heic files
+ * where browsers often report an empty file.type string).
+ */
+export function resolvePhotoMimeType(
+  fileName: string,
+  providedMime?: string | null
+): string {
+  const cleanMime = (providedMime ?? "").trim().toLowerCase();
+  if (
+    cleanMime === "image/jpeg" ||
+    cleanMime === "image/jpg" ||
+    cleanMime === "image/png" ||
+    cleanMime === "image/webp" ||
+    cleanMime === "image/heic" ||
+    cleanMime === "image/heif"
+  ) {
+    return cleanMime === "image/jpg" ? "image/jpeg" : cleanMime;
+  }
+
+  const ext = fileName.toLowerCase().slice(fileName.lastIndexOf("."));
+  switch (ext) {
+    case ".png":
+      return "image/png";
+    case ".webp":
+      return "image/webp";
+    case ".heic":
+      return "image/heic";
+    case ".heif":
+      return "image/heif";
+    default:
+      return "image/jpeg";
+  }
+}
 
 // ============================================================================
 // GENDER & PRONOUN ADAPTATION SYSTEM

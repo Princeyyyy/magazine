@@ -15,6 +15,7 @@ import {
   PHOTO_UPLOAD_CONFIG,
   adaptCopyByGender,
   autoCapitalizeFirst,
+  resolvePhotoMimeType,
   type UploadedPhotoItem,
 } from "@/config/form";
 import {
@@ -36,6 +37,10 @@ interface UploadingFileState {
   errorMessage?: string;
   sessionId?: string;
   uploadUrl?: string;
+  proxyUploadUrl?: string;
+  uploadSig?: string;
+  orderId?: string;
+  resolvedMimeType?: string;
   storageProvider?: "local" | "drive";
   uploadedBytes: number;
   localPreviewUrl?: string;
@@ -123,6 +128,8 @@ export function PhotoUploader({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const photosRef = useRef<UploadedPhotoItem[]>(photos);
   photosRef.current = photos;
+  const queueRef = useRef<UploadingFileState[]>(queue);
+  queueRef.current = queue;
   const draftTokenRef = useRef(draftToken);
   draftTokenRef.current = draftToken;
   const onDraftCreatedRef = useRef(onDraftCreated);
@@ -138,218 +145,289 @@ export function PhotoUploader({
   );
 
   const uploadSingleFile = useCallback(
-    async (item: UploadingFileState) => {
+    async (item: UploadingFileState, forceFreshSession = false) => {
       setQueue((prev) =>
         prev.map((q) =>
           q.tempId === item.tempId
-            ? { ...q, status: "uploading", errorMessage: undefined }
+            ? { ...q, status: "uploading", errorMessage: undefined, progress: forceFreshSession ? 5 : q.progress }
             : q
         )
       );
 
-      try {
-        let sessionId = item.sessionId;
-        let uploadUrl = item.uploadUrl;
-        let storageProvider = item.storageProvider;
-        let startByte = item.uploadedBytes || 0;
+      const MAX_AUTO_RETRIES = 2;
+      let lastError: Error | null = null;
 
-        // 1. Create resumable upload session if not already created
-        if (!sessionId || !uploadUrl) {
-          const sessionRes = await fetch("/api/uploads/session", {
+      for (let attempt = 0; attempt <= MAX_AUTO_RETRIES; attempt++) {
+        try {
+          if (attempt > 0) {
+            // Brief exponential backoff before automatic retry
+            await new Promise((r) => setTimeout(r, attempt === 1 ? 800 : 1800));
+            setQueue((prev) =>
+              prev.map((q) =>
+                q.tempId === item.tempId
+                  ? { ...q, status: "uploading", errorMessage: undefined, progress: 5 }
+                  : q
+              )
+            );
+          }
+
+          const shouldResetSession = forceFreshSession || attempt > 0;
+          let sessionId = shouldResetSession ? undefined : item.sessionId;
+          let uploadUrl = shouldResetSession ? undefined : item.uploadUrl;
+          let proxyUploadUrl = shouldResetSession ? undefined : item.proxyUploadUrl;
+          let uploadSig = shouldResetSession ? undefined : item.uploadSig;
+          let orderId = shouldResetSession ? undefined : item.orderId;
+          let storageProvider = shouldResetSession ? undefined : item.storageProvider;
+          let resolvedMimeType =
+            item.resolvedMimeType ||
+            resolvePhotoMimeType(item.file.name, item.file.type);
+          let startByte = shouldResetSession ? 0 : item.uploadedBytes || 0;
+
+          // 1. Create resumable upload session if not already created
+          if (!sessionId || !uploadUrl) {
+            const sessionRes = await fetch("/api/uploads/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                draftToken: draftTokenRef.current || undefined,
+                fileName: item.file.name,
+                mimeType: resolvedMimeType,
+                sizeBytes: item.file.size,
+                category,
+              }),
+            });
+
+            const sessionData = (await sessionRes.json().catch(() => ({}))) as {
+              session?: {
+                sessionId: string;
+                uploadUrl: string;
+                proxyUploadUrl?: string;
+                uploadSig?: string;
+                orderId?: string;
+                mimeType?: string;
+                storageProvider: "local" | "drive";
+                draftToken?: string;
+                reference?: string;
+              };
+              error?: { code?: string; message?: string };
+            };
+
+            if (!sessionRes.ok || !sessionData.session) {
+              const err = new Error(
+                sessionData.error?.message || "Could not start upload session."
+              );
+              // Do not auto-retry client validation errors (400/409)
+              if (sessionRes.status >= 400 && sessionRes.status < 500 && sessionRes.status !== 429) {
+                throw Object.assign(err, { noRetry: true });
+              }
+              throw err;
+            }
+
+            if (
+              sessionData.session.draftToken &&
+              sessionData.session.draftToken !== draftTokenRef.current
+            ) {
+              draftTokenRef.current = sessionData.session.draftToken;
+              onDraftCreatedRef.current?.(
+                sessionData.session.draftToken,
+                sessionData.session.reference ?? ""
+              );
+            }
+
+            sessionId = sessionData.session.sessionId;
+            uploadUrl = sessionData.session.uploadUrl;
+            proxyUploadUrl = sessionData.session.proxyUploadUrl;
+            uploadSig = sessionData.session.uploadSig;
+            orderId = sessionData.session.orderId;
+            storageProvider = sessionData.session.storageProvider;
+            if (sessionData.session.mimeType) {
+              resolvedMimeType = sessionData.session.mimeType;
+            }
+            startByte = 0;
+
+            setQueue((prev) =>
+              prev.map((q) =>
+                q.tempId === item.tempId
+                  ? {
+                      ...q,
+                      sessionId,
+                      uploadUrl,
+                      proxyUploadUrl,
+                      uploadSig,
+                      orderId,
+                      resolvedMimeType,
+                      storageProvider,
+                    }
+                  : q
+              )
+            );
+          } else if (storageProvider === "local") {
+            // Query server offset to resume interrupted local upload
+            const offsetRes = await fetch(uploadUrl);
+            if (offsetRes.ok) {
+              const offsetData = (await offsetRes.json()) as { offset?: number };
+              if (typeof offsetData.offset === "number") {
+                startByte = offsetData.offset;
+              }
+            }
+          }
+
+          // 2. Upload chunks with progress tracking
+          const totalSize = item.file.size;
+          let driveFileId: string | undefined;
+          const useDriveProxy = Boolean(
+            storageProvider === "drive" && proxyUploadUrl && uploadSig && orderId
+          );
+
+          while (startByte < totalSize) {
+            const endByte = Math.min(startByte + CHUNK_SIZE, totalSize);
+            const chunkBlob = item.file.slice(startByte, endByte);
+
+            const targetUrl = useDriveProxy ? proxyUploadUrl! : uploadUrl;
+            const chunkHeaders: Record<string, string> = {
+              "Content-Type": resolvedMimeType,
+              "Content-Range": `bytes ${startByte}-${endByte - 1}/${totalSize}`,
+            };
+            if (useDriveProxy) {
+              chunkHeaders["x-upload-url"] = uploadUrl;
+              chunkHeaders["x-upload-sig"] = uploadSig!;
+              chunkHeaders["x-order-id"] = orderId!;
+            }
+
+            const chunkRes = await fetch(targetUrl, {
+              method: "PUT",
+              headers: chunkHeaders,
+              body: chunkBlob,
+            });
+
+            if (useDriveProxy) {
+              const proxyData = (await chunkRes.json().catch(() => ({}))) as {
+                ok?: boolean;
+                complete?: boolean;
+                driveFileId?: string;
+                error?: { message?: string; retryable?: boolean };
+              };
+
+              if (!chunkRes.ok || !proxyData.ok) {
+                throw new Error(
+                  proxyData.error?.message ||
+                    `Upload interrupted (HTTP ${chunkRes.status}). Tap Retry to resume.`
+                );
+              }
+
+              if (proxyData.driveFileId) {
+                driveFileId = proxyData.driveFileId;
+              }
+            } else {
+              // Direct local-chunk or legacy direct Drive upload
+              if (!chunkRes.ok && chunkRes.status !== 308) {
+                const errJson = (await chunkRes.json().catch(() => ({}))) as {
+                  error?: { message?: string };
+                };
+                throw new Error(
+                  errJson.error?.message ||
+                    `Upload interrupted (HTTP ${chunkRes.status}). Tap Retry to resume.`
+                );
+              }
+
+              if (
+                storageProvider === "drive" &&
+                (chunkRes.status === 200 || chunkRes.status === 201)
+              ) {
+                try {
+                  const text = await chunkRes.text();
+                  if (text) {
+                    const driveData = JSON.parse(text) as { id?: string };
+                    if (driveData.id) {
+                      driveFileId = driveData.id;
+                    }
+                  }
+                } catch {
+                  // Server-side resolution in finalizeUpload will handle it
+                }
+              }
+            }
+
+            startByte = endByte;
+            const progressPct = Math.round((startByte / totalSize) * 95);
+
+            setQueue((prev) =>
+              prev.map((q) =>
+                q.tempId === item.tempId
+                  ? { ...q, uploadedBytes: startByte, progress: progressPct }
+                  : q
+              )
+            );
+          }
+
+          // 3. Finalize upload on server
+          const finalRes = await fetch("/api/uploads/finalize", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              draftToken: draftTokenRef.current || undefined,
-              fileName: item.file.name,
-              mimeType: item.file.type || "image/jpeg",
-              sizeBytes: item.file.size,
+              draftToken: draftTokenRef.current,
+              sessionId,
+              storageFileId: driveFileId,
+              caption: "",
               category,
+              contentHash: item.contentHash,
+              perceptualHash: item.perceptualHash || undefined,
+              fileName: item.fileName,
+              fileSize: item.file.size,
+              mimeType: resolvedMimeType,
+              uploadUrl,
             }),
           });
 
-          const sessionData = (await sessionRes.json()) as {
-            session?: {
-              sessionId: string;
-              uploadUrl: string;
-              storageProvider: "local" | "drive";
-              draftToken?: string;
-              reference?: string;
-            };
-            error?: { message?: string };
+          const finalData = (await finalRes.json().catch(() => ({}))) as {
+            photo?: UploadedPhotoItem;
+            error?: { code?: string; message?: string };
           };
 
-          if (!sessionRes.ok || !sessionData.session) {
-            throw new Error(
-              sessionData.error?.message || "Could not start upload session."
+          if (!finalRes.ok || !finalData.photo) {
+            const err = new Error(
+              finalData.error?.message || "Failed to finalize photo upload."
             );
-          }
-
-          if (
-            sessionData.session.draftToken &&
-            sessionData.session.draftToken !== draftTokenRef.current
-          ) {
-            draftTokenRef.current = sessionData.session.draftToken;
-            onDraftCreatedRef.current?.(
-              sessionData.session.draftToken,
-              sessionData.session.reference ?? ""
-            );
-          }
-
-          sessionId = sessionData.session.sessionId;
-          uploadUrl = sessionData.session.uploadUrl;
-          storageProvider = sessionData.session.storageProvider;
-          startByte = 0;
-
-          setQueue((prev) =>
-            prev.map((q) =>
-              q.tempId === item.tempId
-                ? { ...q, sessionId, uploadUrl, storageProvider }
-                : q
-            )
-          );
-        } else if (storageProvider === "local") {
-          // Query server offset to resume interrupted upload
-          const offsetRes = await fetch(uploadUrl);
-          if (offsetRes.ok) {
-            const offsetData = (await offsetRes.json()) as { offset?: number };
-            if (typeof offsetData.offset === "number") {
-              startByte = offsetData.offset;
+            // Do not auto-retry duplicate or validation rejections
+            if (
+              finalRes.status === 409 ||
+              finalData.error?.code === "DUPLICATE_PHOTO" ||
+              (finalRes.status >= 400 && finalRes.status < 500 && finalRes.status !== 429)
+            ) {
+              throw Object.assign(err, { noRetry: true });
             }
-          }
-        }
-
-        // 2. Upload chunks with progress tracking
-        const totalSize = item.file.size;
-        let driveFileId: string | undefined;
-
-        while (startByte < totalSize) {
-          const endByte = Math.min(startByte + CHUNK_SIZE, totalSize);
-          const chunkBlob = item.file.slice(startByte, endByte);
-
-          const chunkRes = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": item.file.type || "application/octet-stream",
-              "Content-Range": `bytes ${startByte}-${endByte - 1}/${totalSize}`,
-            },
-            body: chunkBlob,
-          });
-
-          // Google Drive returns 308 Resume Incomplete for intermediate chunks, and 200/201 on completion
-          if (
-            !chunkRes.ok &&
-            chunkRes.status !== 308
-          ) {
-            const errJson = (await chunkRes.json().catch(() => ({}))) as {
-              error?: { message?: string };
-            };
-            throw new Error(
-              errJson.error?.message ||
-                `Upload interrupted (HTTP ${chunkRes.status}). Tap Retry to resume.`
-            );
+            throw err;
           }
 
-          if (storageProvider === "drive" && (chunkRes.status === 200 || chunkRes.status === 201)) {
-            try {
-              const text = await chunkRes.text();
-              if (text) {
-                const driveData = JSON.parse(text) as { id?: string };
-                if (driveData.id) {
-                  driveFileId = driveData.id;
-                }
-              }
-            } catch {
-              // Body parsing failed or already read; server-side resolution will handle it
-            }
-          }
-
-          startByte = endByte;
-          const progressPct = Math.round((startByte / totalSize) * 95);
-
-          setQueue((prev) =>
-            prev.map((q) =>
-              q.tempId === item.tempId
-                ? { ...q, uploadedBytes: startByte, progress: progressPct }
-                : q
-            )
-          );
-        }
-
-        // If upload to Drive finished all bytes but driveFileId wasn't extracted from the response body,
-        // query the upload status directly to retrieve the created file ID.
-        if (storageProvider === "drive" && !driveFileId && startByte >= totalSize) {
-          try {
-            const statusRes = await fetch(uploadUrl, {
-              method: "PUT",
-              headers: {
-                "Content-Range": `bytes */${totalSize}`,
-              },
-            });
-            if (statusRes.status === 200 || statusRes.status === 201) {
-              const statusText = await statusRes.text();
-              if (statusText) {
-                const statusData = JSON.parse(statusText) as { id?: string };
-                if (statusData.id) {
-                  driveFileId = statusData.id;
-                }
-              }
-            }
-          } catch {
-            // Server-side resolution in finalizeUpload will handle it
-          }
-        }
-
-        // 3. Finalize upload on server
-        const finalRes = await fetch("/api/uploads/finalize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            draftToken: draftTokenRef.current,
-            sessionId,
-            storageFileId: driveFileId,
-            caption: "",
+          const finalizedPhoto: UploadedPhotoItem = {
+            ...finalData.photo,
             category,
-            contentHash: item.contentHash,
-            perceptualHash: item.perceptualHash,
-            fileName: item.fileName,
-            fileSize: item.file.size,
-            mimeType: item.file.type,
-            uploadUrl,
-          }),
-        });
+            previewUrl: item.localPreviewUrl || finalData.photo.previewUrl,
+            contentHash: item.contentHash || finalData.photo.contentHash,
+            perceptualHash: item.perceptualHash || finalData.photo.perceptualHash,
+          };
 
-        const finalData = (await finalRes.json()) as {
-          photo?: UploadedPhotoItem;
-          error?: { message?: string };
-        };
-
-        if (!finalRes.ok || !finalData.photo) {
-          throw new Error(
-            finalData.error?.message || "Failed to finalize photo upload."
-          );
+          updatePhotos((prev) => [...prev, finalizedPhoto]);
+          setQueue((prev) => prev.filter((q) => q.tempId !== item.tempId));
+          return;
+        } catch (err) {
+          lastError =
+            err instanceof Error ? err : new Error("Upload failed. Please retry.");
+          const noRetry = Boolean((err as { noRetry?: boolean })?.noRetry);
+          if (noRetry || attempt >= MAX_AUTO_RETRIES) {
+            break;
+          }
         }
-
-        const finalizedPhoto: UploadedPhotoItem = {
-          ...finalData.photo,
-          category,
-          previewUrl: item.localPreviewUrl || finalData.photo.previewUrl,
-          contentHash: item.contentHash || finalData.photo.contentHash,
-          perceptualHash: item.perceptualHash || finalData.photo.perceptualHash,
-        };
-
-        updatePhotos((prev) => [...prev, finalizedPhoto]);
-        setQueue((prev) => prev.filter((q) => q.tempId !== item.tempId));
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "Upload failed. Please retry.";
-        setQueue((prev) =>
-          prev.map((q) =>
-            q.tempId === item.tempId
-              ? { ...q, status: "error", errorMessage: msg }
-              : q
-          )
-        );
       }
+
+      const msg = lastError?.message || "Upload failed. Please retry.";
+      setQueue((prev) =>
+        prev.map((q) =>
+          q.tempId === item.tempId
+            ? { ...q, status: "error", errorMessage: msg }
+            : q
+        )
+      );
     },
     [category, updatePhotos]
   );
@@ -361,7 +439,10 @@ export function PhotoUploader({
       const incoming = Array.from(fileList);
       if (incoming.length === 0) return;
 
-      const currentTotal = photosRef.current.length + queue.length;
+      const activeUploadingCount = queueRef.current.filter(
+        (q) => q.status === "uploading"
+      ).length;
+      const currentTotal = photosRef.current.length + activeUploadingCount;
       if (currentTotal + incoming.length > maxAllowed) {
         setGlobalError(
           `You can upload a maximum of ${maxAllowed} ${isSolo ? "solo" : "shared"} photos. You currently have ${currentTotal}.`
@@ -384,7 +465,7 @@ export function PhotoUploader({
 
         if (!allowedExts.includes(ext)) {
           setGlobalError(
-            `"${file.name}" is not supported. Accepted formats: JPG, JPEG, PNG, HEIC, HEIF.`
+            `"${file.name}" is not supported. Accepted formats: JPG, JPEG, PNG, WEBP, HEIC, HEIF.`
           );
           continue;
         }
@@ -513,7 +594,7 @@ export function PhotoUploader({
         await uploadSingleFile(item);
       }
     },
-    [isSolo, maxAllowed, queue.length, uploadSingleFile, minRequired]
+    [isSolo, maxAllowed, uploadSingleFile, minRequired]
   );
 
   const handleSetCover = async (photoId: string) => {
@@ -703,7 +784,7 @@ export function PhotoUploader({
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.heic,.heif,image/jpeg,image/png,image/heic,image/heif"
+          accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
           className="hidden"
           onChange={(e) => {
             if (e.target.files) {
@@ -805,7 +886,7 @@ export function PhotoUploader({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => void uploadSingleFile(item)}
+                  onClick={() => void uploadSingleFile(item, true)}
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1" />
                   Retry

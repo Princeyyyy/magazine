@@ -141,23 +141,71 @@ if (env.NODE_ENV !== "production") {
   globalForDb.dbInstance = db;
 }
 
+const REQUIRED_SCHEMA_MARKERS: ReadonlyArray<readonly [string, string]> = [
+  ["orders", "drive_folder_url"],
+  ["answers", "question_key"],
+  ["photos", "category"],
+  ["photos", "content_hash"],
+  ["photos", "perceptual_hash"],
+  ["dev_outbox", "template"],
+  ["status_history", "admin_email"],
+];
+
 /**
  * Ensures tables exist when running in local embedded PGlite mode or fresh environments.
- * Uses a single shared Promise lock so concurrent requests never collide.
+ *
+ * For remote PostgreSQL (Neon/Vercel serverless):
+ * 1. Performs a lock-free read-only check against `information_schema.columns` first.
+ *    If all tables & columns already exist, returns immediately with ZERO DDL locks
+ *    (eliminates PostgreSQL 40P01 AccessExclusiveLock deadlocks across concurrent Lambdas).
+ * 2. Only runs BOOTSTRAP_SQL if schema markers are missing, serialized via `pg_advisory_lock`.
+ * 3. Clears `initPromise` on failure so a transient error never poisons a warm Lambda.
  */
 export async function ensureDbReady(): Promise<void> {
   if (globalForDb.initPromise) {
     return globalForDb.initPromise;
   }
 
-  globalForDb.initPromise = (async () => {
+  const runInit = (async () => {
     if (globalForDb.postgresClient) {
-      await globalForDb.postgresClient.unsafe(BOOTSTRAP_SQL);
+      const client = globalForDb.postgresClient;
+
+      // 1. Lock-free check: are all required tables & columns already present?
+      const existingCols = await client<{ table_name: string; column_name: string }[]>`
+        SELECT table_name, column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name IN ('orders', 'answers', 'photos', 'dev_outbox', 'status_history')
+      `;
+
+      const presentSet = new Set(
+        existingCols.map((r) => `${r.table_name}.${r.column_name}`)
+      );
+      const isSchemaReady = REQUIRED_SCHEMA_MARKERS.every(([table, col]) =>
+        presentSet.has(`${table}.${col}`)
+      );
+
+      if (isSchemaReady) {
+        return;
+      }
+
+      // 2. Fresh/unmigrated DB: serialize DDL via advisory lock to prevent deadlocks
+      await client`SELECT pg_advisory_lock(8429173)`;
+      try {
+        await client.unsafe(BOOTSTRAP_SQL);
+      } finally {
+        await client`SELECT pg_advisory_unlock(8429173)`.catch(() => {});
+      }
     } else if (globalForDb.pgliteClient) {
       await globalForDb.pgliteClient.waitReady;
       await globalForDb.pgliteClient.exec(BOOTSTRAP_SQL);
     }
-  })();
+  })().catch((err) => {
+    // Never cache a rejected promise on a warm Lambda
+    globalForDb.initPromise = undefined;
+    throw err;
+  });
 
-  return globalForDb.initPromise;
+  globalForDb.initPromise = runInit;
+  return runInit;
 }
